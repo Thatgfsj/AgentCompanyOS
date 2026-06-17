@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --color-chief:      #3B6FE0;
+  --color-critic-a:   #D04A4A;
+  --color-critic-b:   #7B4FBE;
+  --color-worker-1:   #1B9E8C;
+  --color-worker-2:   #E08A2E;
+  --color-worker-3:   #4A8A3B;
+  --color-worker-4:   #8E5BC1;
+  --color-status-pending: #9CA3AF;
+  --color-status-active:  var(--color-chief);
+  --color-status-done:    #16A34A;
+  --color-status-failed:  #DC2626;
+  --color-status-warn:    #D97706;
+  --color-surface-1:  #0E1116;
+  --color-surface-2:  #161B22;
+  --color-surface-3:  #21262D;
+  --color-primary:    #E6EDF3;
+  --color-text-secondary: #8B949E;
+  --color-border:     #30363D;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: dark;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-surface-1);
+  color: var(--color-primary);
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

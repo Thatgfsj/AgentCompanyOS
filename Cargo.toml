@@ -1,0 +1,82 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/tauri-core",
+    "crates/event-bus",
+    "crates/claude-adapter",
+    "crates/config",
+    "crates/storage",
+]
+
+[workspace.package]
+version     = "0.1.0"
+edition     = "2021"
+rust-version = "1.85"
+license     = "MIT"
+authors     = ["Thatgfsj <thatgfsj@gmail.com>"]
+repository  = "https://github.com/Thatgfsj/AgentCompanyOS"
+
+[workspace.dependencies]
+# Async
+tokio        = { version = "1.40", features = ["full"] }
+async-trait  = "0.1"
+futures      = "0.3"
+
+# Serialization
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+serde_yaml   = "0.9"
+
+# Errors
+thiserror    = "1"
+anyhow       = "1"
+
+# Logging
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Database
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "sqlite",
+    "macros",
+    "chrono",
+    "json",
+    "migrate",
+] }
+
+# Concurrency
+crossbeam-channel = "0.5"
+parking_lot       = "0.12"
+
+# Tauri (only enabled by tauri-core)
+tauri         = { version = "2", optional = true }
+tauri-plugin-shell = { version = "2", optional = true }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Time
+chrono   = { version = "0.4", features = ["serde"] }
+ulid     = { version = "1", features = ["serde"] }
+
+# FS notify
+notify = "6"
+
+# PTY
+portable-pty = "0.8"
+
+# Testing
+insta   = "1.39"
+mockall = "0.13"
+proptest = "1"
+
+[profile.release]
+lto             = "thin"
+codegen-units   = 1
+strip           = "symbols"
+opt-level       = 3
+
+[profile.dev]
+opt-level = 1
+debug     = 1

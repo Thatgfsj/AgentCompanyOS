@@ -1,0 +1,27 @@
+[package]
+name        = "event-bus"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version = { workspace = true }
+license     = { workspace = true }
+description = "Typed pub/sub event bus for ACO (Rust core, Tauri webview, Python runtime)"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+[dependencies]
+tokio        = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+thiserror    = { workspace = true }
+tracing      = { workspace = true }
+crossbeam-channel = { workspace = true }
+parking_lot  = { workspace = true }
+ulid         = { workspace = true }
+chrono       = { workspace = true }
+async-trait  = { workspace = true }
+
+[dev-dependencies]
+insta        = { workspace = true }
+tokio        = { version = "1.40", features = ["full", "test-util"] }

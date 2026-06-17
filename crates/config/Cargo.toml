@@ -1,0 +1,23 @@
+[package]
+name        = "config"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version = { workspace = true }
+license     = { workspace = true }
+description = "Configuration loading and validation for ACO (aco.toml, providers.toml, router.toml)"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+
+[dependencies]
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+serde_yaml   = { workspace = true }
+toml         = "0.8"
+thiserror    = { workspace = true }
+tracing      = { workspace = true }
+dirs         = "5"
+
+[dev-dependencies]
+insta        = { workspace = true }
+tempfile     = "3"

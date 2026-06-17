@@ -1,0 +1,43 @@
+# Auto-detect text files; normalize line endings on commit.
+*               text=auto eol=lf
+
+# Explicitly mark binary files
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.webp          binary
+*.woff          binary
+*.woff2         binary
+*.ttf           binary
+*.eot           binary
+*.wasm          binary
+*.mp3           binary
+*.mp4           binary
+*.wav           binary
+*.ogg           binary
+*.zip           binary
+*.tar.gz        binary
+*.tgz           binary
+
+# Markdown — keep LF, ensure consistent diff
+*.md            text eol=lf
+*.mdx           text eol=lf
+
+# Rust — diff with color always
+*.rs            diff=rust
+
+# Python — strip trailing whitespace
+*.py            text eol=lf
+*.pyi           text eol=lf
+
+# Lockfiles are not diffed across platforms
+pnpm-lock.yaml  text eol=lf
+Cargo.lock      text eol=lf
+uv.lock         text eol=lf
+
+# Export GitHub language stats
+docs/linguist-generated=true
+*.min.js        linguist-generated=true
+*.min.css       linguist-generated=true

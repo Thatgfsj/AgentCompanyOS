@@ -1,0 +1,45 @@
+# aco.toml — top-level runtime config for Agent Company OS.
+# See docs/CONFIG.md §3 for the full schema.
+#
+# This file is the **default**. Override per-project in `.aco/config.yaml`
+# or per-user in `~/.config/aco/config.toml`. See docs/CONFIG.md §2
+# for the hierarchy.
+
+[app]
+data_dir    = "~/.config/aco"
+log_level   = "info"
+theme       = "dark"
+auto_update = false
+telemetry   = false
+
+[workflow]
+max_plan_revisions   = 3
+max_repair_loops     = 3
+max_parallel_workers = 8
+max_total_tokens     = 5_000_000
+max_wallclock_secs   = 14400
+max_user_query_wait  = 3600
+
+[ui]
+show_token_stream   = false
+show_console        = true
+console_height_px   = 240
+timeline_position   = "bottom"
+
+[logging]
+redact         = ["*KEY*", "*TOKEN*", "*SECRET*", "*PASSWORD*", "*AUTH*"]
+format         = "json"
+sample_console = 1.0
+sample_events  = 0.1
+
+[storage]
+retention_usage_days   = 365
+retention_prompts_days = 180
+backup_dir             = "~/.config/aco/backups"
+backup_daily_keep      = 7
+backup_weekly_keep     = 4
+
+[security]
+allow_unrestricted_plugins     = false
+confirm_external_writes        = true
+require_signature_for_plugins  = true

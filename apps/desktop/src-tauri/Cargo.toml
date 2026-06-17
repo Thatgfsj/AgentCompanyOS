@@ -1,0 +1,30 @@
+[package]
+name        = "aco-desktop"
+version     = "0.1.0"
+description = "Tauri 2 shell for Agent Company OS"
+edition     = "2021"
+rust-version = "1.85"
+license     = "MIT"
+publish     = false
+
+[lib]
+name = "aco_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri         = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde         = { version = "1", features = ["derive"] }
+serde_json    = "1"
+tauri-core    = { path = "../../../crates/tauri-core" }
+event-bus     = { path = "../../../crates/event-bus" }
+config        = { path = "../../../crates/config" }
+storage       = { path = "../../../crates/storage" }
+claude-adapter = { path = "../../../crates/claude-adapter" }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

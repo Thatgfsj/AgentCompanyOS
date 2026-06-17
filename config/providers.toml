@@ -1,0 +1,122 @@
+# providers.toml — provider registry. See docs/PROVIDER_SPEC.md §5.2.
+# API keys live in environment variables ONLY — never in this file.
+# See docs/SECURITY.md §2.
+
+# ─── Anthropic ──────────────────────────────────────────────────
+[providers.anthropic]
+type        = "anthropic"
+base_url    = "https://api.anthropic.com"
+api_key_env = "ANTHROPIC_API_KEY"
+enabled     = true
+
+[providers.anthropic.models.claude-opus-4-8]
+display_name      = "Claude Opus 4.8"
+context_window    = 200000
+max_output_tokens = 32000
+input_cost_mtok   = 15.0
+output_cost_mtok  = 75.0
+capabilities      = ["chat", "stream", "vision", "tool_call", "json_mode", "prompt_caching", "reasoning_effort"]
+
+[providers.anthropic.models.claude-sonnet-4-6]
+display_name      = "Claude Sonnet 4.6"
+context_window    = 200000
+max_output_tokens = 16000
+input_cost_mtok   = 3.0
+output_cost_mtok  = 15.0
+capabilities      = ["chat", "stream", "vision", "tool_call", "json_mode", "prompt_caching", "reasoning_effort"]
+
+# ─── OpenAI ────────────────────────────────────────────────────
+[providers.openai]
+type        = "openai"
+base_url    = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+enabled     = true
+
+[providers.openai.models.gpt-5]
+display_name      = "GPT-5"
+context_window    = 128000
+max_output_tokens = 16000
+input_cost_mtok   = 5.0
+output_cost_mtok  = 20.0
+capabilities      = ["chat", "stream", "vision", "tool_call", "json_mode"]
+
+# ─── Google Gemini ─────────────────────────────────────────────
+[providers.google]
+type        = "google"
+base_url    = "https://generativelanguage.googleapis.com"
+api_key_env = "GOOGLE_API_KEY"
+enabled     = true
+
+[providers.google.models.gemini-2-5-pro]
+display_name      = "Gemini 2.5 Pro"
+context_window    = 1000000
+max_output_tokens = 8000
+input_cost_mtok   = 2.5
+output_cost_mtok  = 10.0
+capabilities      = ["chat", "stream", "vision", "tool_call", "json_mode"]
+
+# ─── Kimi (Moonshot) ───────────────────────────────────────────
+[providers.kimi]
+type        = "openai_compat"
+base_url    = "https://api.moonshot.cn/v1"
+api_key_env = "MOONSHOT_API_KEY"
+enabled     = false  # opt-in
+
+[providers.kimi.models.kimi-k2]
+display_name      = "Kimi K2"
+context_window    = 128000
+max_output_tokens = 8000
+input_cost_mtok   = 1.0
+output_cost_mtok  = 3.0
+capabilities      = ["chat", "stream", "tool_call", "json_mode"]
+
+# ─── MiniMax ───────────────────────────────────────────────────
+[providers.minimax]
+type        = "openai_compat"
+base_url    = "https://api.minimaxi.com/v1"
+api_key_env = "MINIMAX_API_KEY"
+enabled     = false  # opt-in
+
+[providers.minimax.models.minimax-m3]
+display_name      = "MiniMax M3"
+context_window    = 32000
+max_output_tokens = 8000
+input_cost_mtok   = 0.5
+output_cost_mtok  = 1.0
+capabilities      = ["chat", "stream", "json_mode"]
+
+# ─── DeepSeek ──────────────────────────────────────────────────
+[providers.deepseek]
+type        = "openai_compat"
+base_url    = "https://api.deepseek.com/v1"
+api_key_env = "DEEPSEEK_API_KEY"
+enabled     = false  # opt-in
+
+[providers.deepseek.models.deepseek-chat]
+display_name      = "DeepSeek Chat"
+context_window    = 64000
+max_output_tokens = 8000
+input_cost_mtok   = 0.27
+output_cost_mtok  = 1.1
+capabilities      = ["chat", "stream", "tool_call", "json_mode"]
+
+[providers.deepseek.models.deepseek-reasoner]
+display_name      = "DeepSeek Reasoner"
+context_window    = 64000
+max_output_tokens = 32000
+input_cost_mtok   = 0.55
+output_cost_mtok  = 2.19
+capabilities      = ["chat", "stream", "reasoning_effort"]
+
+# ─── Local providers (opt-in, no API key required) ────────────
+[providers.ollama]
+type        = "openai_compat"
+base_url    = "http://localhost:11434/v1"
+api_key_env = "OLLAMA_NO_KEY"   # any non-empty placeholder
+enabled     = false  # opt-in
+
+[providers.lmstudio]
+type        = "openai_compat"
+base_url    = "http://localhost:1234/v1"
+api_key_env = "LMSTUDIO_NO_KEY"
+enabled     = false  # opt-in

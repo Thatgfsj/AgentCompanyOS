@@ -1,0 +1,26 @@
+{
+  "name": "@aco/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cross-language types for ACO (events, errors, IPC messages). Source of truth for Rust + Python codegen.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./events": "./src/events.ts",
+    "./errors": "./src/errors.ts",
+    "./protocol": "./src/protocol.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
+    "typecheck": "tsc --noEmit",
+    "schema:gen": "ts-json-schema-generator --path src --type '*' --out schemas/"
+  },
+  "devDependencies": {
+    "ts-json-schema-generator": "^2.3.0",
+    "typescript": "^5.6.0"
+  }
+}

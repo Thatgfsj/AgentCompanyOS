@@ -1,0 +1,36 @@
+[package]
+name        = "tauri-core"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version = { workspace = true }
+license     = { workspace = true }
+description = "Tauri app entry, commands, and glue for Agent Company OS"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[dependencies]
+tauri         = { workspace = true, features = [] }
+tauri-plugin-shell = { workspace = true }
+tokio         = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+thiserror     = { workspace = true }
+tracing       = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap          = { workspace = true }
+anyhow        = { workspace = true }
+event-bus     = { path = "../event-bus" }
+config        = { path = "../config" }
+storage       = { path = "../storage" }
+claude-adapter = { path = "../claude-adapter" }
+ulid          = { workspace = true }
+chrono        = { workspace = true }
+
+[dev-dependencies]
+insta         = { workspace = true }
+tempfile      = "3"
