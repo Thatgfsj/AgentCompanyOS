@@ -25,6 +25,7 @@ All design decisions live in versioned RFCs under [`docs/`](./docs/).
 | Document | Purpose |
 |----------|---------|
 | [PROJECT_SPEC.md](./PROJECT_SPEC.md) | Top-level product vision, philosophy, agents, workflow, roadmap |
+| [docs/TECH_STACK.md](./docs/TECH_STACK.md) | Locked-in tech: Tauri + Rust + React 19 + Python runtime, monorepo layout |
 | [docs/UI_GUIDELINES.md](./docs/UI_GUIDELINES.md) | Mission Control UI design system, layout, components, themes |
 | [docs/AGENT_PROTOCOL.md](./docs/AGENT_PROTOCOL.md) | Inter-agent contract, message format, task lifecycle |
 | [docs/PROVIDER_SPEC.md](./docs/PROVIDER_SPEC.md) | Multi-provider model layer (Anthropic / OpenAI / Gemini / etc.) |
@@ -58,15 +59,18 @@ See [docs/ROADMAP.md](./docs/ROADMAP.md) for details.
 
 ## 🛠️ Tech Stack
 
-> **TBD** — to be decided after v0.1 RFCs are merged.
+Locked-in for v0.1 — see [docs/TECH_STACK.md](./docs/TECH_STACK.md) for the full picture.
 
-Candidate stack (under discussion):
-
-* **Core runtime:** Rust _(per user preference for large systems)_
-* **UI shell:** Tauri + React/TypeScript _(cross-platform desktop, Mission Control layout)_
-* **Agent orchestration:** Rust core + Python ML glue _(via PyO3)_
-* **Provider layer:** Multi-SDK abstraction (see [docs/PROVIDER_SPEC.md](./docs/PROVIDER_SPEC.md))
-* **Execution engine:** Claude Code CLI (v0.1), with adapters for Codex / Aider / Gemini CLI
+* **Desktop shell:** Tauri v2 + Rust + React 19 + TypeScript + Vite
+* **Frontend:** Tailwind v4 · shadcn/ui · Zustand · TanStack Query · Motion · Monaco · Xterm.js · React Flow
+* **Backend (Rust):** Tokio · Tauri IPC · Serde · SQLx · SQLite + FTS5 · portable-pty · Crossbeam
+* **AI Runtime (Python 3.12+):** FastAPI · Uvicorn · Pydantic v2 · asyncio · Loguru · Tenacity · Rich
+* **Agent Framework:** Custom workflow engine, event bus, task-graph scheduler, prompt engine, model router
+* **AI SDKs:** Anthropic · OpenAI · Google GenAI · MiniMax · Moonshot (Kimi) · DeepSeek · OpenRouter · Ollama · LM Studio · OpenAI-compatible
+* **Execution engine (v0.1):** Claude Code CLI
+* **Plugins:** Python plugin API (MCP, Git, Docker, Browser)
+* **Testing:** Vitest · Playwright · cargo test · pytest
+* **CI:** GitHub Actions (clippy · rustfmt · ruff · black · mypy · eslint · prettier)
 
 ---
 
