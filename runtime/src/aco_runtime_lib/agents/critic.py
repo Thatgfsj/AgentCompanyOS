@@ -58,7 +58,7 @@ class CriticAgent(Agent):
                     ),
                 ),
             ],
-            max_tokens=512,
+            max_tokens=2048,
             temperature=0.2,
         )
         try:
@@ -82,9 +82,34 @@ class CriticAgent(Agent):
 
 
 def _parse_verdict(text: str) -> dict[str, Any]:
-    """Find the last JSON object in `text` that has a `verdict` field."""
+    """Find the last JSON object in `text` that has a `verdict` field.
+
+    On parse failure, returns a `REPAIR` verdict with confidence 0.0 and a
+    synthetic `parse_failure` issue — **never** silently PASSes. The previous
+    default (verdict=PASS, confidence=1.0, issues=[]) caused the
+    v0.2.1 validate_minimax false negative: the model's analysis was
+    present in `summary` but its JSON verdict object got truncated by
+    max_tokens=512, so `_parse_verdict` found no verdict and quietly
+    accepted the code as PASS.
+    """
     objs = extract_all_json_objects(text)
     for obj in reversed(objs):
         if "verdict" in obj:
             return obj
-    return {"verdict": "PASS", "confidence": 1.0, "issues": [], "summary": text}
+    return {
+        "verdict": "REPAIR",
+        "confidence": 0.0,
+        "issues": [
+            {
+                "severity": "MAJOR",
+                "kind": "parse_failure",
+                "description": (
+                    "Critic did not emit a REVIEW_RESPONSE JSON object with a "
+                    "'verdict' field. The raw response was captured in 'summary' "
+                    "for triage; treat as REPAIR until the model is fixed to emit "
+                    "structured output."
+                ),
+            }
+        ],
+        "summary": text,
+    }

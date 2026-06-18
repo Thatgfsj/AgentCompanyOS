@@ -6,6 +6,7 @@ members = [
     "crates/claude-adapter",
     "crates/config",
     "crates/storage",
+    "apps/desktop/src-tauri",
 ]
 
 [workspace.package]
@@ -49,9 +50,10 @@ sqlx = { version = "0.8", default-features = false, features = [
 crossbeam-channel = "0.5"
 parking_lot       = "0.12"
 
-# Tauri (only enabled by tauri-core)
-tauri         = { version = "2", optional = true }
-tauri-plugin-shell = { version = "2", optional = true }
+# Tauri (used by tauri-core; non-optional because Cargo workspace
+# deps cannot be optional — Rust 1.83+)
+tauri         = { version = "2" }
+tauri-plugin-shell = { version = "2" }
 
 # CLI
 clap = { version = "4", features = ["derive"] }
