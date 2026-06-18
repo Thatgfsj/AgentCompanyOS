@@ -47,6 +47,22 @@ Produce a planning document in Markdown with this exact structure:
 ## Out of Scope
 
 Do not include any prose outside the plan document.
+
+For Owner Role in the Task Graph table, use ONLY one of these
+exact lowercase values:
+
+  * backend   — Python/Node/Go APIs, services, middleware
+  * frontend  — React/Vue/Svelte UIs, design tokens
+  * database  — schema, migrations, queries
+  * devops    — CI/CD, infra, deploy
+  * qa        — tests, e2e, fuzz
+  * docs      — READMEs, guides, API refs
+  * security  — authn/z, threat models, audits
+  * other     — anything that doesn't fit above
+
+The parser is strict on this column; roles like "Planner",
+"Chief", or "agent:worker" will fail validation. If a task
+genuinely has no role fit, use `other`.
 """
 
 

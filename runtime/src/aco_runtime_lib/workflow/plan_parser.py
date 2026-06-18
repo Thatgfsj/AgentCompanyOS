@@ -249,6 +249,21 @@ _VALID_OWNER_ROLES: frozenset[str] = frozenset(
     }
 )
 
+# Chief-emitted plans sometimes use role names like "Planner",
+# "Chief", or "agent:worker:n" — accept these but surface a
+# warning so the model learns. Strict rejection would force the
+# user to keep re-rolling the Chief until it guesses right.
+_KNOWN_ROLE_ALIASES: dict[str, str] = {
+    "planner": "other",
+    "chief": "other",
+    "worker": "backend",
+    "agent": "other",
+    "design": "frontend",
+    "research": "docs",
+    "analysis": "qa",
+    "ai": "other",
+}
+
 
 def _parse_task_table(body: str) -> list[TaskNode]:
     """Parse the `## Task Graph` Markdown table into `TaskNode`s.
@@ -311,15 +326,20 @@ def _parse_task_table(body: str) -> list[TaskNode]:
     seen_ids: set[str] = set()
     for cells in rows:
         tid, title, role, deps_raw, tokens_raw = cells
-        if not re.fullmatch(r"T\d+", tid):
+        # Accept either "T1" or bare "1"; normalize to "T1" so the
+        # downstream AST always has the canonical form (TASK_GRAPH §2).
+        # Per phase2-1 RFC §10.1: accept both in v0.2, normalize later.
+        m_id = re.fullmatch(r"(?:T)?(\d+)", tid)
+        if not m_id:
             raise PlanParseError(
                 section="Task Graph",
                 kind="bad_id",
                 message=(
-                    f"task ID {tid!r} must match ^T\\d+$ "
-                    "(e.g. T1, T12)"
+                    f"task ID {tid!r} must be 'T<n>' or '<n>' "
+                    "(e.g. T1, T12, 7)"
                 ),
             )
+        tid = f"T{m_id.group(1)}"
         if tid in seen_ids:
             raise PlanParseError(
                 section="Task Graph",
@@ -329,14 +349,23 @@ def _parse_task_table(body: str) -> list[TaskNode]:
         seen_ids.add(tid)
         role_lower = role.lower()
         if role_lower not in _VALID_OWNER_ROLES:
-            raise PlanParseError(
-                section="Task Graph",
-                kind="unknown_owner_role",
-                message=(
-                    f"owner role {role!r} not in "
-                    f"{sorted(_VALID_OWNER_ROLES)}"
-                ),
-            )
+            alias = _KNOWN_ROLE_ALIASES.get(role_lower)
+            if alias is not None:
+                warnings.warn(
+                    f"owner role {role!r} mapped to {alias!r} via alias",
+                    PlanParseWarning,
+                    stacklevel=2,
+                )
+                role_lower = alias
+            else:
+                raise PlanParseError(
+                    section="Task Graph",
+                    kind="unknown_owner_role",
+                    message=(
+                        f"owner role {role!r} not in "
+                        f"{sorted(_VALID_OWNER_ROLES)}; no known alias"
+                    ),
+                )
         tokens_clean = tokens_raw.replace(",", "").strip()
         if not tokens_clean.isdigit():
             raise PlanParseError(

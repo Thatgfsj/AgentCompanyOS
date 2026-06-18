@@ -100,11 +100,14 @@ async def start_workflow(req: dict[str, Any]) -> dict[str, Any]:
             logger.info("captured plan data for {}", wf_id)
         elif event.kind == "task_status":
             # Track live task status so /plan can report current state
-            # even before the workflow finishes.
+            # even before the workflow finishes. Note: the dataclass
+            # field is `task_state` (renamed to avoid collision with
+            # the `task_status()` factory). The wire format keeps
+            # `task_status` (rewritten by `_serialize`).
             entry = _plan_data.setdefault(wf_id, {})
             statuses = entry.setdefault("task_statuses", {})
             statuses[event.task_id] = {
-                "status": event.task_status,
+                "status": event.task_state,
                 "title": event.task_title,
                 "summary": event.task_summary,
                 "files": list(event.task_files or []),

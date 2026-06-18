@@ -359,6 +359,39 @@ g
     assert exc.value.kind == "unknown_owner_role"
 
 
+def test_known_role_alias_mapped_with_warning() -> None:
+    """Common Chief-emitted roles like 'Planner' / 'Chief' / 'Worker'
+    are mapped to canonical roles via _KNOWN_ROLE_ALIASES (instead of
+    failing strict validation). A PlanParseWarning fires for
+    observability."""
+    import warnings as _w
+    md = """\
+# Plan: X
+## Goal
+g
+## Task Graph
+| ID | Title | Owner Role | Depends On | Est. Tokens |
+|----|-------|------------|------------|-------------|
+| T1 | a | Planner | — | 100 |
+| T2 | b | Chief | — | 100 |
+| T3 | c | Worker | T1 | 100 |
+## Acceptance Criteria
+1. ok
+"""
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        p = parse_plan(md)
+    plan_warnings = [
+        x for x in caught if issubclass(x.category, PlanParseWarning)
+    ]
+    assert len(plan_warnings) == 3
+    # Planner → other, Chief → other, Worker → backend
+    by_id = {n.id: n.owner_role for n in p.nodes}
+    assert by_id["T1"] == "other"
+    assert by_id["T2"] == "other"
+    assert by_id["T3"] == "backend"
+
+
 def test_bad_tokens_raises() -> None:
     md = """\
 # Plan: X

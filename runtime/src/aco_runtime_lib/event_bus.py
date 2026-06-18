@@ -54,7 +54,10 @@ class WfEvent:
     # task_status fields
     task_id: str | None = None
     task_title: str | None = None
-    task_status: TaskStatusKind | None = None
+    # NB: the dataclass field name must NOT collide with the
+    # `task_status()` factory below; the field is `task_state` so
+    # that `WfEvent.task_status(...)` keeps its staticmethod meaning.
+    task_state: TaskStatusKind | None = None
     task_summary: str | None = None
     task_files: tuple[str, ...] | None = None
 
@@ -96,7 +99,7 @@ class WfEvent:
         )
 
     @staticmethod
-    def task_status(
+    def mk_task_status(
         task_id: str,
         task_title: str,
         status: TaskStatusKind,
@@ -108,7 +111,7 @@ class WfEvent:
             ts=now_iso(),
             task_id=task_id,
             task_title=task_title,
-            task_status=status,
+            task_state=status,
             task_summary=summary,
             task_files=files,
         )

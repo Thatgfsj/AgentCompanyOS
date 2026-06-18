@@ -27,14 +27,22 @@ def bind_bus(bus: EventBus) -> None:
 
 
 def _serialize(event: WfEvent) -> dict[str, Any]:
-    """Drop None-valued fields so the JSON is small."""
+    """Drop None-valued fields so the JSON is small.
+
+    Field-name rewrites for wire compatibility:
+      * `task_state` → `task_status` (the Python dataclass field
+        was renamed to avoid colliding with the `task_status()`
+        staticmethod factory, but the wire format keeps the
+        original name to match `packages/shared/src/events.ts`).
+    """
     out: dict[str, Any] = {"kind": event.kind, "ts": event.ts}
     for f in event.__dataclass_fields__:
         if f in ("kind", "ts"):
             continue
         v = getattr(event, f)
         if v is not None:
-            out[f] = v
+            wire_key = "task_status" if f == "task_state" else f
+            out[wire_key] = v
     return out
 
 

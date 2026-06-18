@@ -166,15 +166,19 @@ class WorkflowOrchestrator:
         sm = StateMachine(ctx, self.bus, initial=State.REQ_RECEIVED)
         self._ctx = ctx
         self._sm = sm
-        # Hook the StateMachine so on_event fires for every transition.
-        # This lets the API route capture plan data as soon as the
-        # planning phase completes (not just at workflow end).
+        # Hook the bus so on_event fires for every event (transitions
+        # + task_status + console + ...). This lets the API route
+        # capture plan data as soon as the planning phase completes
+        # and live-update per-task status, not just at workflow end.
         if self.options.on_event:
-            _orig_emit = sm._emit_event
-            async def _emit(event: WfEvent) -> None:
-                await _orig_emit(event)
-                await self.options.on_event(event)  # type: ignore[misc]
-            sm._emit_event = _emit  # type: ignore[method-assign]
+            _orig_publish = self.bus.publish
+            on_event = self.options.on_event
+
+            async def _publish(event: WfEvent) -> None:
+                await _orig_publish(event)
+                await on_event(event)
+
+            self.bus.publish = _publish  # type: ignore[method-assign]
 
         # Publish a milestone so the UI lights up immediately.
         await self._emit_milestone("收到用户请求")
@@ -327,7 +331,7 @@ class WorkflowOrchestrator:
 
         # Emit RUNNING so the UI can mark the task as in-progress.
         await self.bus.publish(
-            WfEvent.task_status(
+            WfEvent.mk_task_status(
                 task_id=task_id,
                 task_title=title,
                 status="RUNNING",
@@ -358,7 +362,7 @@ class WorkflowOrchestrator:
                     f"任务失败：{result.data.get('message', '?')}",
                 )
                 await self.bus.publish(
-                    WfEvent.task_status(
+                    WfEvent.mk_task_status(
                         task_id=task_id,
                         task_title=title,
                         status="FAILED",
@@ -387,7 +391,7 @@ class WorkflowOrchestrator:
             # Review pass.
             if not self.options.enable_review:
                 await self.bus.publish(
-                    WfEvent.task_status(
+                    WfEvent.mk_task_status(
                         task_id=task_id,
                         task_title=title,
                         status="DONE",
@@ -413,7 +417,7 @@ class WorkflowOrchestrator:
             verdict = crit.data.get("verdict", "PASS")
             if verdict == "PASS" or attempts > self.options.max_repair_loops:
                 await self.bus.publish(
-                    WfEvent.task_status(
+                    WfEvent.mk_task_status(
                         task_id=task_id,
                         task_title=title,
                         status="DONE",
@@ -435,7 +439,7 @@ class WorkflowOrchestrator:
             )
 
         await self.bus.publish(
-            WfEvent.task_status(
+            WfEvent.mk_task_status(
                 task_id=task_id,
                 task_title=title,
                 status="FAILED",
