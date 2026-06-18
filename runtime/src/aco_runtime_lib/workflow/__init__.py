@@ -29,6 +29,12 @@ from aco_runtime_lib.workflow.plan_parser import (
     TaskNode,
     parse_plan,
 )
+from aco_runtime_lib.workflow.plan_validator import (
+    PlanValidationError,
+    ValidationOptions,
+    ValidationResult,
+    validate_plan,
+)
 from aco_runtime_lib.workflow.recovery import ResumableWorkflow, find_resumable
 from aco_runtime_lib.workflow.state_machine import (
     TERMINAL_STATES,
@@ -48,6 +54,7 @@ __all__ = [
     "ParsedPlan",
     "PlanParseError",
     "PlanParseWarning",
+    "PlanValidationError",
     "ResumableWorkflow",
     "Risk",
     "SchemaChange",
@@ -55,6 +62,8 @@ __all__ = [
     "StateMachine",
     "TaskNode",
     "Transition",
+    "ValidationOptions",
+    "ValidationResult",
     "WorkflowCtx",
     "WorkflowLog",
     "WorkflowOrchestrator",
@@ -62,4 +71,5 @@ __all__ = [
     "iter_entries_sync",
     "last_entry",
     "parse_plan",
+    "validate_plan",
 ]

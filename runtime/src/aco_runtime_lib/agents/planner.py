@@ -25,6 +25,11 @@ from aco_runtime_lib.workflow.plan_parser import (
     PlanParseError,
     parse_plan,
 )
+from aco_runtime_lib.workflow.plan_validator import (
+    PlanValidationError,
+    ValidationResult,
+    validate_plan,
+)
 
 PLANNER_SYSTEM_PROMPT = """\
 You are the Planner for Agent Company OS.
@@ -79,17 +84,32 @@ class PlannerAgent(Agent):
         # unknown section, etc.) — surface it in the result so the
         # Chief's repair loop can feed the error back to the LLM
         # instead of crashing the workflow.
+        parsed: ParsedPlan | None = None
+        parse_error: dict[str, Any] | None = None
+        validation: ValidationResult | None = None
+        validation_error: dict[str, Any] | None = None
         try:
-            parsed: ParsedPlan | None = parse_plan(plan_md)
-            parse_error: dict[str, Any] | None = None
+            parsed = parse_plan(plan_md)
         except PlanParseError as e:
-            parsed = None
             parse_error = {
                 "section": e.section,
                 "kind": e.kind,
                 "line": e.line,
                 "message": str(e),
             }
+        # Phase 2.2: semantic checks (acyclic, budget, node count).
+        # Skip if parser failed — the repair loop will fix parse
+        # errors first.
+        if parsed is not None:
+            try:
+                validation = validate_plan(parsed.nodes, parsed.edges)
+            except PlanValidationError as e:
+                validation_error = {
+                    "rule": e.rule,
+                    "task_id": e.task_id,
+                    "cycle": e.cycle,
+                    "message": str(e),
+                }
         return AgentResult(
             role=self.role,
             data={
@@ -97,6 +117,8 @@ class PlannerAgent(Agent):
                 "tasks": tasks,
                 "parsed_plan": parsed,
                 "parse_error": parse_error,
+                "validation": validation,
+                "validation_error": validation_error,
             },
         )
 
