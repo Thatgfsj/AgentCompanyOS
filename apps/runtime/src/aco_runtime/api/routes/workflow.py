@@ -42,6 +42,13 @@ async init in future versions.
 _factory: OrchestratorFactory | None = None
 _runs: dict[str, OrchestratorResult] = {}
 _tasks: dict[str, asyncio.Task[None]] = {}
+_plan_data: dict[str, dict[str, Any]] = {}
+"""Per-workflow plan data captured at the planning phase.
+
+Keys: wf_id.
+Values: {plan_md, parsed_plan, parse_error, validation, validation_error, tasks}.
+The UI's /plan endpoint reads this to render the task list before the
+workflow finishes."""
 
 
 def bind_orchestrator_factory(factory: OrchestratorFactory) -> None:
@@ -77,9 +84,36 @@ async def start_workflow(req: dict[str, Any]) -> dict[str, Any]:
     speed = req.get("speed", "balanced")
     if speed not in ("fast", "balanced", "thorough"):
         speed = "balanced"
+
+    async def _on_event(event: Any) -> None:
+        """Capture plan data as soon as the planning phase completes."""
+        if event.kind == "transition" and event.to_state == "PLAN_DRAFTED":
+            ctx = orchestrator._ctx  # type: ignore[attr-defined]
+            _plan_data[wf_id] = {
+                "plan_md": ctx.data.get("plan_md"),
+                "parsed_plan": ctx.data.get("parsed_plan"),
+                "parse_error": ctx.data.get("parse_error"),
+                "validation": ctx.data.get("validation"),
+                "validation_error": ctx.data.get("validation_error"),
+                "tasks": ctx.data.get("tasks") or [],
+            }
+            logger.info("captured plan data for {}", wf_id)
+        elif event.kind == "task_status":
+            # Track live task status so /plan can report current state
+            # even before the workflow finishes.
+            entry = _plan_data.setdefault(wf_id, {})
+            statuses = entry.setdefault("task_statuses", {})
+            statuses[event.task_id] = {
+                "status": event.task_status,
+                "title": event.task_title,
+                "summary": event.task_summary,
+                "files": list(event.task_files or []),
+            }
+
     options = OrchestratorOptions(
         speed=speed,
         enable_review=bool(req.get("enable_review", True)),
+        on_event=_on_event,
     )
     wf_id = f"wf_{uuid.uuid4().hex[:10]}"
     factory = get_factory()
@@ -133,6 +167,39 @@ async def get_workflow_summary(wf_id: str) -> dict[str, Any]:
     return {
         "id": wf_id,
         "summary": _runs[wf_id].summary,
+    }
+
+
+@router.get("/{wf_id}/plan")
+async def get_workflow_plan(wf_id: str) -> dict[str, Any]:
+    """Return the parsed plan for the workflow.
+
+    Used by the desktop UI to render the task list (right panel)
+    and the Plan tab (Phase 2.4 graph). Available as soon as the
+    orchestrator's planning phase completes; for in-flight
+    workflows, returns whatever's been captured so far.
+    """
+    data = _plan_data.get(wf_id)
+    if data is None:
+        # The workflow might still be in REQ_RECEIVED / REQ_ANALYZING.
+        # Return an empty plan so the UI can render a "loading" state.
+        return {
+            "id": wf_id,
+            "parsed_plan": None,
+            "tasks": [],
+            "task_statuses": {},
+            "parse_error": None,
+            "validation_error": None,
+            "status": "pending",
+        }
+    return {
+        "id": wf_id,
+        "parsed_plan": data.get("parsed_plan"),
+        "tasks": data.get("tasks") or [],
+        "task_statuses": data.get("task_statuses", {}),
+        "parse_error": data.get("parse_error"),
+        "validation_error": data.get("validation_error"),
+        "status": "ready",
     }
 
 

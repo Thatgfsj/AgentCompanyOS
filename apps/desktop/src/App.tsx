@@ -52,14 +52,14 @@ interface TaskRow {
   owner: string;
   fileHint?: string;
   state: string;
+  summary?: string;
 }
 
-const INITIAL_TASKS: ReadonlyArray<TaskRow> = [
-  { id: 't1', title: '后端：实现 /login 接口', owner: '执行员 1', fileHint: 'src/auth/login.py', state: 'PENDING' },
-  { id: 't2', title: '前端：LoginForm 组件', owner: '执行员 2', fileHint: 'src/components/LoginForm.tsx', state: 'PENDING' },
-  { id: 't3', title: '数据库：users 表迁移', owner: '执行员 3', fileHint: 'migrations/0001_users.sql', state: 'PENDING' },
-  { id: 't4', title: '测试：登录流程端到端', owner: '执行员 4', fileHint: 'tests/e2e/test_login.py', state: 'PENDING' },
-];
+// Tasks are populated dynamically from GET /api/workflow/{id}/plan
+// after the orchestrator's planning phase completes. The legacy
+// hardcoded placeholders were removed in this commit because they
+// never reflected what the runtime was actually working on.
+const INITIAL_TASKS: ReadonlyArray<TaskRow> = [];
 
 type AgentStatusMap = {
   chief: AgentStatus;
@@ -111,6 +111,47 @@ export function App() {
     window.__acoCurrentWfId = currentWfId;
   }, [currentWfId]);
 
+  // Whenever a new workflow starts, poll /plan until it's ready,
+  // then replace the task list with the real tasks. Falls back to
+  // appending rows as task_status events arrive (see applyEvent).
+  useEffect(() => {
+    if (!currentWfId) return;
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      while (!cancelled && attempts < 60) {
+        attempts += 1;
+        try {
+          const r = await fetch(`${RUNTIME_URL}/api/workflow/${currentWfId}/plan`);
+          if (r.ok) {
+            const data = await r.json();
+            if (cancelled) return;
+            if (data?.status === 'ready' && data.parsed_plan?.nodes) {
+              const rows: TaskRow[] = data.parsed_plan.nodes.map(
+                (n: { id: string; title: string; owner_role?: string }) => ({
+                  id: n.id,
+                  title: n.title,
+                  owner: n.owner_role ?? '',
+                  fileHint: undefined,
+                  state: 'PENDING',
+                }),
+              );
+              setTasks(rows);
+              return;
+            }
+          }
+        } catch {
+          // fall through and retry
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentWfId]);
+
   // Probe the runtime on mount to decide real vs simulator.
   useEffect(() => {
     void (async () => {
@@ -134,7 +175,7 @@ export function App() {
     }
     setActivePhase(0);
     setPhaseStates({ ...PHASE_STATE });
-    setTasks([...INITIAL_TASKS]);
+    setTasks([]);
     setAgentStatus({ ...INITIAL_AGENT_STATUS });
     setEvents([]);
     setCompleted(false);
@@ -177,13 +218,39 @@ export function App() {
         setAgentStatus((prev) => ({ ...prev, worker: 'thinking' }));
       }
     }
+    if (event.kind === 'task_status' && event.task_id) {
+      // Update the matching row's state in place. If the task isn't
+      // in the list yet (orchestrator emitted before we fetched
+      // /plan), append a fresh row.
+      const newState = event.task_status;
+      const summary = event.task_summary;
+      setTasks((prev) => {
+        const idx = prev.findIndex((t) => t.id === event.task_id);
+        if (idx >= 0) {
+          const next = prev.slice();
+          next[idx] = { ...next[idx], state: newState, summary };
+          return next;
+        }
+        // Append a row using the event's task_title as the title.
+        return [
+          ...prev,
+          {
+            id: event.task_id!,
+            title: event.task_title ?? event.task_id!,
+            owner: '',
+            state: newState,
+            summary,
+          },
+        ];
+      });
+    }
   };
 
   const startRealWorkflow = async (text: string) => {
     busyRef.current = true;
     setBusy(true);
     setEvents([]);
-    setTasks([...INITIAL_TASKS]);
+    setTasks([]);
     setMilestones([]);
     setReviewVerdict(null);
     setFinalReport(null);

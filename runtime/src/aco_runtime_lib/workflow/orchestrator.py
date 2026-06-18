@@ -166,6 +166,15 @@ class WorkflowOrchestrator:
         sm = StateMachine(ctx, self.bus, initial=State.REQ_RECEIVED)
         self._ctx = ctx
         self._sm = sm
+        # Hook the StateMachine so on_event fires for every transition.
+        # This lets the API route capture plan data as soon as the
+        # planning phase completes (not just at workflow end).
+        if self.options.on_event:
+            _orig_emit = sm._emit_event
+            async def _emit(event: WfEvent) -> None:
+                await _orig_emit(event)
+                await self.options.on_event(event)  # type: ignore[misc]
+            sm._emit_event = _emit  # type: ignore[method-assign]
 
         # Publish a milestone so the UI lights up immediately.
         await self._emit_milestone("收到用户请求")
@@ -190,7 +199,18 @@ class WorkflowOrchestrator:
         planner = await self._agent(self.planner, {"user_request": user_request})
         plan_md = planner.data.get("plan_md", "")
         tasks = planner.data.get("tasks") or _synthesize_tasks(plan_md, user_request)
+        # Phase 2.1+ output: full ParsedPlan AST (or None if the
+        # planner hit a parse error). Surface both the AST and
+        # the error to /plan so the UI can show the badge.
+        parsed_plan = planner.data.get("parsed_plan")
+        parse_error = planner.data.get("parse_error")
+        validation = planner.data.get("validation")
+        validation_error = planner.data.get("validation_error")
         ctx.data["plan_md"] = plan_md
+        ctx.data["parsed_plan"] = parsed_plan
+        ctx.data["parse_error"] = parse_error
+        ctx.data["validation"] = validation
+        ctx.data["validation_error"] = validation_error
         ctx.data["tasks"] = tasks
         await self._bus_console(
             "agent:chief",
@@ -301,12 +321,22 @@ class WorkflowOrchestrator:
     async def _run_one_task(self, task: dict[str, Any]) -> dict[str, Any]:
         """Run a single task with a review pass; repair if needed."""
         title = task.get("title", "Untitled task")
+        task_id = task.get("id", "t?")
         sm = self._sm
         ctx = self._ctx
 
+        # Emit RUNNING so the UI can mark the task as in-progress.
+        await self.bus.publish(
+            WfEvent.task_status(
+                task_id=task_id,
+                task_title=title,
+                status="RUNNING",
+            )
+        )
+
         # Build a TASK_ASSIGN-shaped envelope for the worker.
         envelope = {
-            "task_id": task.get("id", "t?"),
+            "task_id": task_id,
             "title": title,
             "objective": title,
             "interfaces": {"consumes": [], "produces": []},
@@ -327,8 +357,16 @@ class WorkflowOrchestrator:
                     "error",
                     f"任务失败：{result.data.get('message', '?')}",
                 )
+                await self.bus.publish(
+                    WfEvent.task_status(
+                        task_id=task_id,
+                        task_title=title,
+                        status="FAILED",
+                        summary=result.data.get("message", "?"),
+                    )
+                )
                 return {
-                    "task_id": envelope["task_id"],
+                    "task_id": task_id,
                     "title": title,
                     "status": "FAILED",
                     "summary": result.data.get("message", "?"),
@@ -336,6 +374,10 @@ class WorkflowOrchestrator:
                 }
             files = result.data.get("files_modified", [])
             summary = result.data.get("summary", "(no summary)")
+            file_paths = tuple(
+                f.get("path", "?") if isinstance(f, dict) else str(f)
+                for f in files
+            )
             await self._bus_console(
                 "agent:worker",
                 "info",
@@ -344,8 +386,17 @@ class WorkflowOrchestrator:
 
             # Review pass.
             if not self.options.enable_review:
+                await self.bus.publish(
+                    WfEvent.task_status(
+                        task_id=task_id,
+                        task_title=title,
+                        status="DONE",
+                        summary=summary,
+                        files=file_paths,
+                    )
+                )
                 return {
-                    "task_id": envelope["task_id"],
+                    "task_id": task_id,
                     "title": title,
                     "status": "DONE",
                     "summary": summary,
@@ -361,8 +412,17 @@ class WorkflowOrchestrator:
             )
             verdict = crit.data.get("verdict", "PASS")
             if verdict == "PASS" or attempts > self.options.max_repair_loops:
+                await self.bus.publish(
+                    WfEvent.task_status(
+                        task_id=task_id,
+                        task_title=title,
+                        status="DONE",
+                        summary=summary,
+                        files=file_paths,
+                    )
+                )
                 return {
-                    "task_id": envelope["task_id"],
+                    "task_id": task_id,
                     "title": title,
                     "status": "DONE",
                     "summary": summary,
@@ -374,8 +434,16 @@ class WorkflowOrchestrator:
                 f"需要修复：{title}",
             )
 
+        await self.bus.publish(
+            WfEvent.task_status(
+                task_id=task_id,
+                task_title=title,
+                status="FAILED",
+                summary="max repair loops reached",
+            )
+        )
         return {
-            "task_id": envelope["task_id"],
+            "task_id": task_id,
             "title": title,
             "status": "FAILED",
             "summary": "max repair loops reached",

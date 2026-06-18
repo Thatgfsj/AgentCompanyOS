@@ -82,6 +82,22 @@ pub enum WfEvent {
         /// Optional choices.
         options: Vec<String>,
     },
+    /// Per-task status update from the orchestrator.
+    TaskStatus {
+        /// ISO 8601 timestamp.
+        ts: String,
+        /// Task id (matches TaskNode.id in the parsed plan).
+        task_id: String,
+        /// Human-readable title for UI display.
+        task_title: String,
+        /// New status: PENDING | DISPATCHED | RUNNING | DONE |
+        /// APPROVED | FAILED | REPAIRING | AWAITING_REVIEW.
+        task_status: String,
+        /// Optional one-line summary.
+        task_summary: Option<String>,
+        /// Optional list of files modified.
+        task_files: Option<Vec<String>>,
+    },
 }
 
 /// Severity for `WfEvent::Console`.

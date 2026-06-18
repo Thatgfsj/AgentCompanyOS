@@ -16,7 +16,18 @@ export type WfEvent =
   | TokenUsageEvent
   | ConsoleEvent
   | MilestoneEvent
-  | UserQueryEvent;
+  | UserQueryEvent
+  | TaskStatusEvent;
+
+export type TaskStatusKind =
+  | 'PENDING'
+  | 'DISPATCHED'
+  | 'RUNNING'
+  | 'DONE'
+  | 'APPROVED'
+  | 'FAILED'
+  | 'REPAIRING'
+  | 'AWAITING_REVIEW';
 
 export interface TransitionEvent {
   readonly kind: 'transition';
@@ -58,4 +69,15 @@ export interface UserQueryEvent {
   readonly query_id: string;
   readonly question: string;
   readonly options: readonly string[];
+}
+
+export interface TaskStatusEvent {
+  readonly kind: 'task_status';
+  /** ISO 8601 timestamp. */
+  readonly ts: string;
+  readonly task_id: string;
+  readonly task_title: string;
+  readonly task_status: TaskStatusKind;
+  readonly task_summary?: string;
+  readonly task_files?: readonly string[];
 }

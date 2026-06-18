@@ -15,12 +15,21 @@ from loguru import logger
 
 LogLevel = Literal["trace", "debug", "info", "warn", "error"]
 
+TaskStatusKind = Literal[
+    "PENDING", "DISPATCHED", "RUNNING",
+    "DONE", "APPROVED", "FAILED", "REPAIRING",
+    "AWAITING_REVIEW",
+]
+
 
 @dataclass(frozen=True, slots=True)
 class WfEvent:
     """A workflow event. See `packages/shared/src/events.ts`."""
 
-    kind: Literal["transition", "token_usage", "console", "milestone", "user_query"]
+    kind: Literal[
+        "transition", "token_usage", "console", "milestone",
+        "user_query", "task_status",
+    ]
     ts: str
     # Optional fields; use `replace` to construct variants.
     wf_id: str | None = None
@@ -42,6 +51,12 @@ class WfEvent:
     query_id: str | None = None
     question: str | None = None
     options: tuple[str, ...] | None = None
+    # task_status fields
+    task_id: str | None = None
+    task_title: str | None = None
+    task_status: TaskStatusKind | None = None
+    task_summary: str | None = None
+    task_files: tuple[str, ...] | None = None
 
     @staticmethod
     def transition(
@@ -78,6 +93,24 @@ class WfEvent:
             ts=now_iso(),
             phase=phase,
             label=label,
+        )
+
+    @staticmethod
+    def task_status(
+        task_id: str,
+        task_title: str,
+        status: TaskStatusKind,
+        summary: str | None = None,
+        files: tuple[str, ...] | None = None,
+    ) -> WfEvent:
+        return WfEvent(
+            kind="task_status",
+            ts=now_iso(),
+            task_id=task_id,
+            task_title=task_title,
+            task_status=status,
+            task_summary=summary,
+            task_files=files,
         )
 
 
