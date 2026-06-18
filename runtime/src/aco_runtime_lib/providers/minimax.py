@@ -15,7 +15,6 @@ from typing import Any
 import httpx
 
 from aco_runtime_lib.providers.base import (
-    ChatMessage,
     ChatRequest,
     ChatResponse,
     FinishReason,
@@ -78,10 +77,11 @@ class MiniMaxProvider(Provider):
             async for line in resp.aiter_lines():
                 if not line.startswith("data: "):
                     continue
-                payload = line[len("data: "):]
+                payload = line[len("data: ") :]
                 if payload.strip() == "[DONE]":
                     break
                 import json as _json
+
                 try:
                     evt = _json.loads(payload)
                 except _json.JSONDecodeError:
@@ -104,10 +104,7 @@ class MiniMaxProvider(Provider):
 def _build_request_body(req: ChatRequest) -> dict[str, Any]:
     return {
         "model": req.model,
-        "messages": [
-            {"role": m.role, "content": m.content}
-            for m in req.messages
-        ],
+        "messages": [{"role": m.role, "content": m.content} for m in req.messages],
         "max_tokens": req.max_tokens or 2048,
         "temperature": req.temperature if req.temperature is not None else 0.7,
         "top_p": 0.9,

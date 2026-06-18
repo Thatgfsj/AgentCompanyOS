@@ -93,10 +93,18 @@ class Provider(ABC):
 
     @abstractmethod
     def stream(self, req: ChatRequest) -> AsyncIterator[str]:
-        """Token-by-token stream of assistant content."""
+        """Return an async iterator of assistant content tokens.
+
+        NOTE: This must be a regular `def` returning an async
+        generator, not an `async def`. Concrete providers that
+        use SSE (httpx) should wrap the SSE parsing in an inner
+        `async def _gen(...)` and `return _gen(req)` from `stream`.
+        """
         raise NotImplementedError
-        # Use `yield` in subclasses; the `raise` here silences the type checker.
-        yield ""
+        # `yield` below is unreachable; it just satisfies the type
+        # checker that this is an async generator.
+        if False:  # pragma: no cover
+            yield ""
 
     def context_window(self, model: str) -> int:
         """Max input tokens for this model. Override per provider."""

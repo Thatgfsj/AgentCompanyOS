@@ -121,6 +121,29 @@ def _under_repair_budget(ctx: WorkflowCtx) -> bool:
     return ctx.repair_count < 3
 
 
+def _plan_revision_budget_exhausted(ctx: WorkflowCtx) -> bool:
+    """Guard for the `max_revisions` transition.
+
+    The caller fires `max_revisions` when they have hit the budget
+    cap. The transition is rejected (InvalidTransitionError) if
+    the counter is below the cap, because firing it early would
+    skip revisions that should still be allowed.
+    """
+    return ctx.plan_revision_count >= 3
+
+
+def _plan_verdict_allows_approval(ctx: WorkflowCtx) -> bool:
+    """Approve the plan only if the Chief has set the verdict AND
+    there are no major issues. The Chief writes `ctx.data["plan_verdict"]`
+    = "APPROVED" | "REVISING" before firing `both_critics_done`.
+    """
+    return ctx.data.get("plan_verdict") == "APPROVED"
+
+
+def _plan_verdict_requires_revision(ctx: WorkflowCtx) -> bool:
+    return ctx.data.get("plan_verdict") == "REVISING"
+
+
 # ── Transition table ─────────────────────────────────────────────
 # Mirrors `docs/WORKFLOW_SPEC.md` §4 exactly.
 
@@ -138,16 +161,29 @@ TRANSITIONS: Final[tuple[Transition, ...]] = (
     Transition(State.PLAN_DRAFTING, "plan_emitted", State.PLAN_DRAFTED),
     # Phase 3
     Transition(State.PLAN_DRAFTED, "dispatch_review", State.PLAN_UNDER_REVIEW),
+    # The Chief decides APPROVED vs REVISING (based on critic output)
+    # and writes `ctx.data["plan_verdict"]` before firing the event.
+    # Guards are mutually exclusive; iteration order is therefore
+    # unambiguous.
     Transition(
-        State.PLAN_UNDER_REVIEW, "both_critics_done", State.PLAN_REVISING, _critics_raised_issues
+        State.PLAN_UNDER_REVIEW,
+        "both_critics_done",
+        State.PLAN_REVISING,
+        _plan_verdict_requires_revision,
     ),
     Transition(
-        State.PLAN_UNDER_REVIEW, "both_critics_done", State.PLAN_APPROVED, _no_open_questions
+        State.PLAN_UNDER_REVIEW,
+        "both_critics_done",
+        State.PLAN_APPROVED,
+        _plan_verdict_allows_approval,
     ),
-    # `_both_critics_done` should fire before `_critics_raised_issues` in practice,
-    # but we can't express ordering here; the guard logic handles it.
     Transition(State.PLAN_REVISING, "plan_revised", State.PLAN_DRAFTED),
-    Transition(State.PLAN_REVISING, "max_revisions", State.FAILED),
+    Transition(
+        State.PLAN_REVISING,
+        "max_revisions",
+        State.FAILED,
+        _plan_revision_budget_exhausted,
+    ),
     # Phase 4
     Transition(State.PLAN_APPROVED, "start_dispatch", State.DISPATCHING),
     # Phase 5

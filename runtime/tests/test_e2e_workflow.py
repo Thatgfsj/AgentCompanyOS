@@ -16,14 +16,23 @@ based on the input. This keeps the test deterministic and offline.
 
 from __future__ import annotations
 
-import asyncio
 import json
-from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
-
 from aco_runtime_lib import EventBus, State, StateMachine, WorkflowCtx
+from aco_runtime_lib.agents import (
+    AgentRole,
+    ChiefAgent,
+    CriticAgent,
+    PlannerAgent,
+    ReporterAgent,
+    WorkerAgent,
+)
+from aco_runtime_lib.providers import (
+    MockProvider,
+    default_router,
+)
 from aco_runtime_lib.workflow import (
     LogEntry,
     WorkflowLog,
@@ -31,19 +40,6 @@ from aco_runtime_lib.workflow import (
     iter_entries_sync,
     last_entry,
 )
-from aco_runtime_lib.providers import (
-    MockProvider,
-    default_router,
-)
-from aco_runtime_lib.agents import (
-    ChiefAgent,
-    CriticAgent,
-    PlannerAgent,
-    ReporterAgent,
-    WorkerAgent,
-    AgentRole,
-)
-
 
 # ── Mock scripting ───────────────────────────────────────────────
 
@@ -182,7 +178,7 @@ async def test_e2e_happy_path_writes_full_jsonl(tmp_path: Path) -> None:
         await sm.transition("dispatch_review")
         sm.ctx.data["critic_a_verdict"] = "PASS"
         sm.ctx.data["critic_b_verdict"] = "PASS"
-        sm.ctx.data["any_major_issue"] = False
+        sm.ctx.data["plan_verdict"] = "APPROVED"
         await sm.transition("both_critics_done")
         # Phase 4
         await sm.transition("start_dispatch")
@@ -220,8 +216,12 @@ async def test_e2e_persistence_then_replay(tmp_path: Path) -> None:
     log = WorkflowLog(log_path)
     await log.open()
     await log.append("wf_partial", None, State.REQ_RECEIVED, "user_input", "agent:user")
-    await log.append("wf_partial", State.REQ_RECEIVED, State.REQ_ANALYZING, "start_analysis", "agent:chief")
-    await log.append("wf_partial", State.REQ_ANALYZING, State.REQ_CLARIFIED, "analysis_done", "agent:chief")
+    await log.append(
+        "wf_partial", State.REQ_RECEIVED, State.REQ_ANALYZING, "start_analysis", "agent:chief"
+    )
+    await log.append(
+        "wf_partial", State.REQ_ANALYZING, State.REQ_CLARIFIED, "analysis_done", "agent:chief"
+    )
     await log.append(
         "wf_partial", State.REQ_CLARIFIED, State.PLAN_DRAFTING, "start_planning", "agent:chief"
     )
@@ -285,17 +285,13 @@ async def test_e2e_with_mock_agents_full_loop(tmp_path: Path) -> None:
     await sm.transition("dispatch_review")
 
     # Critics review the plan
-    crit_a_result = await critic_a.run(
-        {"subject": "Plan", "ask": "Is this sound?", "files": []}
-    )
-    crit_b_result = await critic_b.run(
-        {"subject": "Plan", "ask": "Is this sound?", "files": []}
-    )
+    crit_a_result = await critic_a.run({"subject": "Plan", "ask": "Is this sound?", "files": []})
+    crit_b_result = await critic_b.run({"subject": "Plan", "ask": "Is this sound?", "files": []})
     assert crit_a_result.data["verdict"] == "PASS"
     assert crit_b_result.data["verdict"] == "PASS"
     sm.ctx.data["critic_a_verdict"] = "PASS"
     sm.ctx.data["critic_b_verdict"] = "PASS"
-    sm.ctx.data["any_major_issue"] = False
+    sm.ctx.data["plan_verdict"] = "APPROVED"
     await sm.transition("both_critics_done")
     assert sm.state == State.PLAN_APPROVED
 
@@ -353,7 +349,7 @@ async def test_e2e_with_mock_agents_full_loop(tmp_path: Path) -> None:
     assert "Delivery Summary" in summary
     assert "src/auth/login.py" in summary
 
-    # The mock was called: planner, chief, critic_a (×2), critic_b (×2), worker
+    # The mock was called: planner, chief, critic_a (x2), critic_b (x2), worker
     assert len(mock.calls) >= 5
 
 
@@ -367,10 +363,18 @@ async def test_e2e_replay_rebuilds_state_machine(tmp_path: Path) -> None:
     await log.open()
     # Walk a workflow halfway and stop.
     await log.append("wf_replay", None, State.REQ_RECEIVED, "user_input", "agent:user")
-    await log.append("wf_replay", State.REQ_RECEIVED, State.REQ_ANALYZING, "start_analysis", "agent:chief")
-    await log.append("wf_replay", State.REQ_ANALYZING, State.REQ_CLARIFIED, "analysis_done", "agent:chief")
-    await log.append("wf_replay", State.REQ_CLARIFIED, State.PLAN_DRAFTING, "start_planning", "agent:chief")
-    await log.append("wf_replay", State.PLAN_DRAFTING, State.PLAN_DRAFTED, "plan_emitted", "agent:chief")
+    await log.append(
+        "wf_replay", State.REQ_RECEIVED, State.REQ_ANALYZING, "start_analysis", "agent:chief"
+    )
+    await log.append(
+        "wf_replay", State.REQ_ANALYZING, State.REQ_CLARIFIED, "analysis_done", "agent:chief"
+    )
+    await log.append(
+        "wf_replay", State.REQ_CLARIFIED, State.PLAN_DRAFTING, "start_planning", "agent:chief"
+    )
+    await log.append(
+        "wf_replay", State.PLAN_DRAFTING, State.PLAN_DRAFTED, "plan_emitted", "agent:chief"
+    )
     await log.close()
 
     # Replay: read the entries and reconstruct the path

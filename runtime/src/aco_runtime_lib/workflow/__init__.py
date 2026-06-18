@@ -14,22 +14,22 @@ from aco_runtime_lib.workflow.persistence import (
 )
 from aco_runtime_lib.workflow.recovery import ResumableWorkflow, find_resumable
 from aco_runtime_lib.workflow.state_machine import (
+    TERMINAL_STATES,
     State,
     StateMachine,
     Transition,
     WorkflowCtx,
-    TERMINAL_STATES,
 )
 
 __all__ = [
+    "TERMINAL_STATES",
+    "LogEntry",
+    "ResumableWorkflow",
     "State",
     "StateMachine",
     "Transition",
     "WorkflowCtx",
-    "TERMINAL_STATES",
-    "LogEntry",
     "WorkflowLog",
-    "ResumableWorkflow",
     "find_resumable",
     "iter_entries_sync",
     "last_entry",

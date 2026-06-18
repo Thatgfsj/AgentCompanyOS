@@ -16,6 +16,7 @@ from aco_runtime_lib.providers.router import (
     ModelRef,
     ModelRouter,
     RouterConfig,
+    RouterError,
     default_router,
 )
 
@@ -32,6 +33,7 @@ __all__ = [
     "Provider",
     "ProviderError",
     "RouterConfig",
+    "RouterError",
     "ScriptedResponse",
     "Usage",
     "default_router",

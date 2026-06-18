@@ -17,7 +17,11 @@ from __future__ import annotations
 import pytest
 from aco_runtime_lib import EventBus, State, StateMachine, WfEvent
 from aco_runtime_lib.workflow import WorkflowCtx
-from aco_runtime_lib.workflow.state_machine import TERMINAL_STATES, TRANSITIONS
+from aco_runtime_lib.workflow.state_machine import (
+    TERMINAL_STATES,
+    TRANSITIONS,
+    InvalidTransitionError,
+)
 
 # ── Helpers ─────────────────────────────────────────────────────
 
@@ -63,7 +67,7 @@ async def _drive_to_done(sm: StateMachine) -> list[WfEvent]:
         await sm.transition("dispatch_review")
         sm.ctx.data["critic_a_verdict"] = "PASS"
         sm.ctx.data["critic_b_verdict"] = "PASS"
-        sm.ctx.data["any_major_issue"] = False
+        sm.ctx.data["plan_verdict"] = "APPROVED"
         await sm.transition("both_critics_done")
         assert sm.state == State.PLAN_APPROVED
 
@@ -141,14 +145,14 @@ async def test_terminal_state_refuses_all_transitions() -> None:
     sm, _ = _make_sm()
     await _drive_to_done(sm)
     assert sm.is_terminal
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidTransitionError):
         await sm.transition("user_abort")
 
 
 @pytest.mark.asyncio
 async def test_invalid_transition_raises() -> None:
     sm, _ = _make_sm()
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidTransitionError):
         await sm.transition("plan_emitted")  # wrong state
 
 
@@ -173,7 +177,7 @@ async def test_critic_issues_send_plan_to_revision() -> None:
     await sm.transition("dispatch_review")
     sm.ctx.data["critic_a_verdict"] = "REPAIR"
     sm.ctx.data["critic_b_verdict"] = "PASS"
-    sm.ctx.data["any_major_issue"] = True
+    sm.ctx.data["plan_verdict"] = "REVISING"
     await sm.transition("both_critics_done")
     assert sm.state == State.PLAN_REVISING
 
@@ -188,7 +192,7 @@ async def test_repair_loop_increments_counter() -> None:
     await sm.transition("dispatch_review")
     sm.ctx.data["critic_a_verdict"] = "REPAIR"
     sm.ctx.data["critic_b_verdict"] = "PASS"
-    sm.ctx.data["any_major_issue"] = True
+    sm.ctx.data["plan_verdict"] = "REVISING"
     await sm.transition("both_critics_done")
     assert sm.ctx.plan_revision_count == 0
     await sm.transition("plan_revised")
@@ -227,30 +231,53 @@ async def test_events_are_published_to_bus() -> None:
 
 @pytest.mark.asyncio
 async def test_repair_budget_exhaustion() -> None:
-    """3 repair loops then FAILED."""
+    """3 plan revisions then FAILED via max_revisions."""
     sm, _ = _make_sm()
-    # Get to REVIEWING quickly
+
+    async def one_revision_round() -> None:
+        await sm.transition("dispatch_review")
+        sm.ctx.data["plan_verdict"] = "REVISING"
+        await sm.transition("both_critics_done")
+        await sm.transition("plan_revised")
+
+    await sm.transition("start_analysis")
+    await sm.transition("analysis_done")
+    await sm.transition("start_planning")
+    await sm.transition("plan_emitted")
+    # Three full revision rounds
+    await one_revision_round()
+    await one_revision_round()
+    await one_revision_round()
+    assert sm.ctx.plan_revision_count == 3
+    # One more REVISING → still in PLAN_REVISING, but counter not bumped
+    await sm.transition("dispatch_review")
+    sm.ctx.data["plan_verdict"] = "REVISING"
+    await sm.transition("both_critics_done")
+    # Now fire max_revisions (budget exhausted)
+    await sm.transition("max_revisions")
+    assert sm.state == State.FAILED
+    assert sm.is_terminal
+
+
+@pytest.mark.asyncio
+async def test_plan_revision_budget_guard() -> None:
+    """`max_revisions` is rejected when the budget is not yet exhausted."""
+    sm, _ = _make_sm()
+    # Reach PLAN_REVISING with counter=0
     await sm.transition("start_analysis")
     await sm.transition("analysis_done")
     await sm.transition("start_planning")
     await sm.transition("plan_emitted")
     await sm.transition("dispatch_review")
-    sm.ctx.data["critic_a_verdict"] = "REPAIR"
-    sm.ctx.data["critic_b_verdict"] = "REPAIR"
-    sm.ctx.data["any_major_issue"] = True
+    sm.ctx.data["plan_verdict"] = "REVISING"
     await sm.transition("both_critics_done")
-    await sm.transition("plan_revised")
-    # After revision, critics still complain
-    sm.ctx.data["any_major_issue"] = True
-    await sm.transition("dispatch_review")
-    await sm.transition("both_critics_done")
-    await sm.transition("plan_revised")
-    # Third revision
-    sm.ctx.data["any_major_issue"] = True
-    await sm.transition("dispatch_review")
-    await sm.transition("both_critics_done")
-    # Budget exhausted on max_revisions
+
+    # Budget not exhausted → max_revisions rejected
+    with pytest.raises(InvalidTransitionError):
+        await sm.transition("max_revisions")
     assert sm.state == State.PLAN_REVISING
+
+    # Bump the counter to 3 → max_revisions allowed
+    sm.ctx.plan_revision_count = 3
     await sm.transition("max_revisions")
     assert sm.state == State.FAILED
-    assert sm.is_terminal

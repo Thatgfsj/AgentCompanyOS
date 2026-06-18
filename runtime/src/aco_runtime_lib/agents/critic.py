@@ -10,10 +10,9 @@ See `prompts/critic_a.md` and `prompts/critic_b.md`.
 
 from __future__ import annotations
 
-import json
-import re
 from typing import Any
 
+from aco_runtime_lib.agents._json_extract import extract_all_json_objects
 from aco_runtime_lib.agents.base import Agent, AgentResult, AgentRole
 from aco_runtime_lib.event_bus import EventBus
 from aco_runtime_lib.providers.base import ChatMessage, ChatRequest, ProviderError
@@ -82,16 +81,10 @@ class CriticAgent(Agent):
         )
 
 
-_VERDICT_RE = re.compile(r"\{.*\}", re.DOTALL)
-
-
 def _parse_verdict(text: str) -> dict[str, Any]:
-    matches = list(_VERDICT_RE.finditer(text))
-    for m in reversed(matches):
-        try:
-            parsed = json.loads(m.group(0))
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict) and "verdict" in parsed:
-            return parsed
+    """Find the last JSON object in `text` that has a `verdict` field."""
+    objs = extract_all_json_objects(text)
+    for obj in reversed(objs):
+        if "verdict" in obj:
+            return obj
     return {"verdict": "PASS", "confidence": 1.0, "issues": [], "summary": text}

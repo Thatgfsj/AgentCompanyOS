@@ -91,19 +91,30 @@ class WorkflowLog:
     async def open(self) -> None:
         """Open the file (creating parent dirs) and seed the seq counter
         by reading any existing entries.
+
+        Crash-safety: if the file ends without a newline (the previous
+        process died mid-write), the partial trailing line is dropped
+        and the seq counter is set to the count of **complete** lines.
         """
         async with self._lock:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             if self._path.exists():
-                # Count existing lines; cheapest is to count newlines.
                 text = self._path.read_text(encoding="utf-8")
-                self._seq = text.count("\n")
-                # Truncate the file at the end of the last newline in
-                # case the previous run crashed mid-write.
                 if not text.endswith("\n"):
+                    # Crash mid-write: drop the partial line, keep
+                    # the rest. Count complete lines (every \n we
+                    # keep is a complete line).
                     last_nl = text.rfind("\n")
                     if last_nl >= 0:
+                        self._seq = text[: last_nl + 1].count("\n")
                         self._path.write_text(text[: last_nl + 1], encoding="utf-8")
+                    else:
+                        # No complete line at all; file is wholly
+                        # garbage. Start fresh.
+                        self._seq = 0
+                        self._path.write_text("", encoding="utf-8")
+                else:
+                    self._seq = text.count("\n")
             self._fh = self._path.open("a", encoding="utf-8", buffering=1)
 
     async def close(self) -> None:
@@ -183,6 +194,12 @@ async def iter_entries(path: Path) -> AsyncIterator[LogEntry]:
                 continue
 
 
+async def iter_entries_async(path: Path) -> AsyncIterator[LogEntry]:
+    """Async-iterator alias for `iter_entries` (deprecated)."""
+    async for entry in iter_entries(path):
+        yield entry
+
+
 def last_entry(path: Path) -> LogEntry | None:
     """Return the last entry in a log, or None if empty/missing."""
     last: LogEntry | None = None
@@ -223,17 +240,6 @@ def iter_entries_sync(path: Path):  # type: ignore[no-untyped-def]
 async def _aiter_sync(it: object) -> AsyncIterator[LogEntry]:
     for entry in it:  # type: ignore[union-attr]
         yield entry
-
-
-# Re-export under the async name
-async def iter_entries_async(path: Path) -> AsyncIterator[LogEntry]:
-    async for entry in _aiter_sync(iter_entries_sync(path)):
-        yield entry
-
-
-# Patch the alias: `iter_entries` returns the async-friendly form
-# (the name conflict is intentional — callers use `async for`).
-iter_entries = iter_entries_async
 
 
 # ── Atomic write helper (for tests + first-time writes) ─────────

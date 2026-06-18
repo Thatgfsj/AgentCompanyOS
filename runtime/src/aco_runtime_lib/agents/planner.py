@@ -87,7 +87,9 @@ def _extract_task_table(plan_md: str) -> list[dict[str, Any]]:
                 "id": m.group(1).strip(),
                 "title": m.group(2).strip(),
                 "owner_role": m.group(3).strip(),
-                "depends_on": [d.strip() for d in m.group(4).split(",") if d.strip() and d.strip() != "—"],
+                "depends_on": [
+                    d.strip() for d in m.group(4).split(",") if d.strip() and d.strip() != "—"
+                ],
                 "est_tokens": int(tokens_str) if tokens_str.isdigit() else 0,
             }
         )

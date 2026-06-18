@@ -16,7 +16,6 @@ from typing import Any
 import httpx
 
 from aco_runtime_lib.providers.base import (
-    ChatMessage,
     ChatRequest,
     ChatResponse,
     FinishReason,
@@ -93,9 +92,7 @@ class AnthropicProvider(Provider):
             "anthropic-version": self._api_version,
             "content-type": "application/json",
         }
-        async with self._client.stream(
-            "POST", "/v1/messages", json=body, headers=headers
-        ) as resp:
+        async with self._client.stream("POST", "/v1/messages", json=body, headers=headers) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 if not line:

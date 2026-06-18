@@ -13,11 +13,10 @@ See `docs/AGENT_PROTOCOL.md` §3, `prompts/chief_agent.md`.
 
 from __future__ import annotations
 
-import json
-import re
 from dataclasses import dataclass
 from typing import Any
 
+from aco_runtime_lib.agents._json_extract import extract_last_json_object
 from aco_runtime_lib.agents.base import Agent, AgentResult, AgentRole
 from aco_runtime_lib.event_bus import EventBus
 from aco_runtime_lib.providers.base import ChatMessage, ProviderError
@@ -57,9 +56,7 @@ class ChiefAgent(Agent):
             ChatMessage(role="user", content=request_text),
         ]
         try:
-            response = await provider.chat(
-                _make_request(ref.model_id, messages, max_tokens=2048)
-            )
+            response = await provider.chat(_make_request(ref.model_id, messages, max_tokens=2048))
         except ProviderError as e:
             return AgentResult(
                 role=self.role,
@@ -100,29 +97,15 @@ def _parse_chief_response(text: str) -> ChiefOutput:
     """Tolerantly extract a JSON object from the model's text.
 
     The Chief often wraps JSON in prose or fences; we scan for the
-    last top-level JSON object in the text.
+    last top-level JSON object in the text using the brace-matching
+    scanner in `_json_extract` (so multiple objects don't merge
+    into one greedy match).
     """
-    obj = _extract_last_json(text)
+    obj = extract_last_json_object(text)
     if obj is None:
         return ChiefOutput(kind="summary", payload={"text": text})
     kind = obj.get("kind") or obj.get("type") or "summary"
     return ChiefOutput(kind=str(kind), payload=obj)
-
-
-_JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
-
-
-def _extract_last_json(text: str) -> dict[str, Any] | None:
-    matches = list(_JSON_OBJECT_RE.finditer(text))
-    for m in reversed(matches):
-        candidate = m.group(0)
-        try:
-            parsed = json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            return parsed
-    return None
 
 
 def _token_usage_event(

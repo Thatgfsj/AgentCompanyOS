@@ -17,7 +17,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from aco_runtime_lib.providers.base import (
@@ -46,14 +46,13 @@ class MockProvider(Provider):
     """Deterministic provider for tests."""
 
     id: str = "mock"
-    capabilities: frozenset[str] = frozenset(
-        {"chat", "stream", "tool_call", "json_mode"}
-    )
+    capabilities: frozenset[str] = frozenset({"chat", "stream", "tool_call", "json_mode"})
 
     def __init__(self) -> None:
         self._script: list[ScriptedResponse] = []
         self._default_content: str = '{"ok": true}'
         self._calls: list[ChatRequest] = []
+        self._streamed_chunks: list[str] = []
 
     # ── Test helpers ──────────────────────────────────────────────
 
@@ -89,11 +88,19 @@ class MockProvider(Provider):
             ),
         )
 
-    async def stream(self, req: ChatRequest) -> AsyncIterator[str]:
-        # Yield the canned response as one chunk (no real streaming
-        # in mock mode).
+    async def _gen(self, req: ChatRequest) -> AsyncIterator[str]:
+        # Real async generator: each call awaits chat() and yields
+        # the response in token-sized chunks.
         response = await self.chat(req)
-        yield response.content
+        # Split the response into 8-char chunks to simulate tokens.
+        chunk_size = 8
+        for i in range(0, len(response.content), chunk_size):
+            chunk = response.content[i : i + chunk_size]
+            self._streamed_chunks.append(chunk)
+            yield chunk
+
+    def stream(self, req: ChatRequest) -> AsyncIterator[str]:
+        return self._gen(req)
 
     def context_window(self, model: str) -> int:
         return 128_000

@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
 
+from loguru import logger
+
 LogLevel = Literal["trace", "debug", "info", "warn", "error"]
 
 
@@ -90,23 +92,39 @@ class EventBus:
         self._subscribers: list[asyncio.Queue[WfEvent]] = []
         self._capacity = capacity
         self._lock = asyncio.Lock()
+        self.dropped_events: int = 0
+        """Total events dropped because a subscriber's queue was full.
+        Read this in tests / monitoring. Reset with `reset_drop_counter()`."""
+
+    def reset_drop_counter(self) -> None:
+        self.dropped_events = 0
 
     async def publish(self, event: WfEvent) -> None:
         """Publish an event to all subscribers.
 
         If a subscriber's queue is full, the event is **dropped** for
-        that subscriber and a warning is logged. This prevents a slow
-        consumer from blocking the bus.
+        that subscriber, the drop counter is incremented, and a
+        warning is logged. This prevents a slow consumer from
+        blocking the bus. The JSONL workflow log remains the
+        source of truth; live consumers can re-read from there.
         """
         async with self._lock:
             subs = list(self._subscribers)
+        dropped_this_call = 0
         for q in subs:
             try:
                 q.put_nowait(event)
             except asyncio.QueueFull:
-                # Drop. The workflow log is the source of truth; live
-                # consumers can re-read from there.
-                pass
+                dropped_this_call += 1
+        if dropped_this_call:
+            self.dropped_events += dropped_this_call
+            logger.warning(
+                "EventBus dropped event (subscriber queue full): "
+                "kind={} dropped_count={} total_dropped={}",
+                event.kind,
+                dropped_this_call,
+                self.dropped_events,
+            )
 
     async def subscribe(self) -> asyncio.Queue[WfEvent]:
         """Subscribe to all future events.

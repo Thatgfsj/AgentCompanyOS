@@ -11,10 +11,9 @@ See `prompts/worker.md` and `docs/AGENT_PROTOCOL.md` §5.1-§5.3.
 
 from __future__ import annotations
 
-import json
-import re
 from typing import Any
 
+from aco_runtime_lib.agents._json_extract import extract_all_json_objects
 from aco_runtime_lib.agents.base import Agent, AgentResult, AgentRole
 from aco_runtime_lib.providers.base import (
     ChatMessage,
@@ -123,16 +122,10 @@ def _render_task_envelope(ctx: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-_TASK_RESULT_RE = re.compile(r"\{.*\}", re.DOTALL)
-
-
 def _parse_task_result(text: str) -> dict[str, Any]:
-    matches = list(_TASK_RESULT_RE.finditer(text))
-    for m in reversed(matches):
-        try:
-            parsed = json.loads(m.group(0))
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            return parsed
+    """Find the last JSON object in `text` that has a `status` field."""
+    objs = extract_all_json_objects(text)
+    for obj in reversed(objs):
+        if "status" in obj:
+            return obj
     return {"status": "FAILED", "summary": f"could not parse worker output: {text[:200]}"}
