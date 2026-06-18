@@ -53,7 +53,7 @@ class PlannerAgent(Agent):
                     content=f"User request: {ctx.get('user_request', '')}",
                 ),
             ],
-            max_tokens=512,
+            max_tokens=4096,
             temperature=0.4,
         )
         try:
