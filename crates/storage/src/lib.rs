@@ -56,7 +56,10 @@ impl WorkflowStatus {
 }
 
 /// A workflow row.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// Note: derives `PartialEq` but not `Eq` because `total_cost_usd`
+/// is `Option<f64>`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Workflow {
     /// Workflow id (ULID).
     pub id: String,

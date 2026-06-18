@@ -4,7 +4,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::Manager;
-use tauri_core::{start_workflow, AppState};
+use tauri_core::{start_workflow, AppState, NewWorkflowRequest, NewWorkflowResponse};
+
+#[tauri::command]
+async fn start_workflow_cmd(
+    state: tauri::State<'_, AppState>,
+    req: NewWorkflowRequest,
+) -> Result<NewWorkflowResponse, String> {
+    start_workflow(state, req).await.map_err(|e| e)
+}
 
 #[tauri::command]
 async fn get_workflow(
@@ -69,7 +77,7 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![start_workflow, get_workflow, cancel_workflow])
+        .invoke_handler(tauri::generate_handler![start_workflow_cmd, get_workflow, cancel_workflow])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -76,6 +76,6 @@ async fn run(_request: &str) -> Result<()> {
 
 fn info() -> Result<()> {
     println!("aco {}", env!("CARGO_PKG_VERSION"));
-    println!("data dir: {:?}", AppState::build().now_or_never().map(|_| "ok".to_string()));
+    println!("data dir: <see `aco doctor` to initialize>");
     Ok(())
 }

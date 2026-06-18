@@ -91,3 +91,5 @@ out/
 *.deb
 *.rpm
 *.AppImage
+Cargo.lock
+Cargo.lock

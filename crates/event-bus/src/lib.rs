@@ -18,7 +18,11 @@ use thiserror::Error;
 use tokio::sync::broadcast;
 
 /// A workflow event. Mirrors `docs/WORKFLOW_SPEC.md` §8.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// Note: derives `PartialEq` but not `Eq` because `TokenUsage`'s
+/// `cost_usd: Option<f64>` contains an `f64`, and `f64` doesn't
+/// implement `Eq` (NaN != NaN).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum WfEvent {
     /// State machine transitioned from one state to another.

@@ -17,7 +17,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Top-level runtime config. See `docs/CONFIG.md` §3.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// Note: derives `PartialEq` but not `Eq` because some nested
+/// sections (`LoggingSection`, `ModelSpec`) contain `f32`/`f64`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AcoConfig {
     /// App-wide settings.
     pub app: AppSection,
@@ -79,7 +82,10 @@ pub struct UiSection {
 }
 
 /// Logging config.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// Note: derives `PartialEq` but not `Eq` because `sample_console`
+/// and `sample_events` are `f32`, which doesn't implement `Eq`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LoggingSection {
     /// Patterns to redact from logs.
     pub redact: Vec<String>,
@@ -164,7 +170,10 @@ pub enum LogFormat {
 }
 
 /// Provider list. See `docs/PROVIDER_SPEC.md` §5.2 and `docs/CONFIG.md` §4.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+///
+/// Note: derives `PartialEq` but not `Eq` because `ProviderEntry`
+/// contains `ModelSpec` which has `f64` fields.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ProvidersConfig {
     /// Providers keyed by id.
     #[serde(default)]
@@ -172,7 +181,10 @@ pub struct ProvidersConfig {
 }
 
 /// One provider entry.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// Note: derives `PartialEq` but not `Eq` because `models` contains
+/// `ModelSpec` which has `f64` fields.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProviderEntry {
     /// Provider kind (`anthropic` | `openai` | `google` | `openai_compat` | ...).
     #[serde(rename = "type")]
@@ -194,7 +206,10 @@ fn default_true() -> bool {
 }
 
 /// Model spec. See `docs/PROVIDER_SPEC.md` §4.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// Note: derives `PartialEq` but not `Eq` because `input_cost_mtok`
+/// and `output_cost_mtok` are `f64`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ModelSpec {
     /// Human-readable name.
     pub display_name: String,

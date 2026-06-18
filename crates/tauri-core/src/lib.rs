@@ -121,6 +121,11 @@ pub struct NewWorkflowResponse {
 }
 
 /// Start a new workflow. Stub for Phase 0; real impl in Phase 1.
+///
+/// NOT annotated with `#[tauri::command]` because this is the core
+/// library; the Tauri shell (`apps/desktop/src-tauri/src/lib.rs`)
+/// wraps it in its own command. Adding `#[tauri::command]` here
+/// would cause a duplicate-macro-definition error at link time.
 pub async fn start_workflow(
     state: tauri::State<'_, AppState>,
     req: NewWorkflowRequest,

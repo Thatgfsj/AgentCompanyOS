@@ -115,7 +115,7 @@ pub struct TestCounts {
 
 /// A trait for spawning the Claude Code CLI.
 #[async_trait]
-pub trait ClaudeRunner: Send + Sync {
+pub trait ClaudeRunner: Send + Sync + std::fmt::Debug {
     /// Run the CLI with the given task JSON and return the parsed
     /// result plus raw output.
     async fn run(
@@ -128,6 +128,7 @@ pub trait ClaudeRunner: Send + Sync {
 
 /// Default implementation that uses `portable-pty` to spawn the
 /// `claude` CLI.
+#[derive(Debug)]
 pub struct PtyClaudeRunner {
     /// Path to the `claude` binary. Defaults to `claude` on `$PATH`.
     pub binary: PathBuf,
