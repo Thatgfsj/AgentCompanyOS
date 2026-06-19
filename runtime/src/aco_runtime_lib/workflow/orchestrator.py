@@ -23,6 +23,7 @@ Simplifications for v0.2 (per the iterative plan):
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -66,6 +67,22 @@ class OrchestratorOptions:
 
     max_repair_loops: int = 1
     """Per-task repair budget before giving up."""
+
+    # Per-agent hard timeouts (CEO-assigned "working time"). Each
+    # agent LLM call is wrapped in asyncio.timeout(agent_timeout_*).
+    # On timeout the call is aborted and the agent returns an
+    # `error="timeout"` AgentResult; the task is then marked FAILED
+    # and (if applicable) the orchestrator moves on. Default 180s is
+    # generous for cloud models; local 1B-3B models often finish
+    # within 30-60s. Setting too low will give false positives;
+    # setting too high risks the "self-lock" small-model pathology
+    # the user wants to avoid.
+    chief_timeout_seconds: float = 180.0
+    planner_timeout_seconds: float = 180.0
+    critic_a_timeout_seconds: float = 180.0
+    critic_b_timeout_seconds: float = 180.0
+    worker_timeout_seconds: float = 180.0
+    reporter_timeout_seconds: float = 180.0
 
     on_event: Callable[[WfEvent], Awaitable[None]] | None = None
     """Optional hook called for every event (in addition to bus.publish)."""
@@ -185,7 +202,11 @@ class WorkflowOrchestrator:
 
         # ── Phase 1: Requirement ──────────────────────────────────
         await self._t("start_analysis")
-        chief = await self._agent(self.chief, {"user_request": user_request})
+        chief = await self._agent(
+            self.chief,
+            {"user_request": user_request},
+            timeout=self.options.chief_timeout_seconds,
+        )
         chief_data = chief.data
         # Simplified: treat the request as clear (no clarification
         # loop in v0.2). If the model says UNCLEAR, we just log and
@@ -200,7 +221,11 @@ class WorkflowOrchestrator:
 
         # ── Phase 2: Planning ─────────────────────────────────────
         await self._t("start_planning")
-        planner = await self._agent(self.planner, {"user_request": user_request})
+        planner = await self._agent(
+            self.planner,
+            {"user_request": user_request},
+            timeout=self.options.planner_timeout_seconds,
+        )
         plan_md = planner.data.get("plan_md", "")
         tasks = planner.data.get("tasks") or _synthesize_tasks(plan_md, user_request)
         # Phase 2.1+ output: full ParsedPlan AST (or None if the
@@ -229,10 +254,12 @@ class WorkflowOrchestrator:
             crit_a_res = await self._agent(
                 self.critic_a,
                 _plan_review_request(plan_md),
+                timeout=self.options.critic_a_timeout_seconds,
             )
             crit_b_res = await self._agent(
                 self.critic_b,
                 _plan_review_request(plan_md),
+                timeout=self.options.critic_b_timeout_seconds,
             )
             ctx.data["critic_a_verdict"] = crit_a_res.data.get("verdict", "PASS")
             ctx.data["critic_b_verdict"] = crit_b_res.data.get("verdict", "PASS")
@@ -275,6 +302,7 @@ class WorkflowOrchestrator:
                         if r.get("files_modified")
                     ],
                 },
+                timeout=self.options.critic_a_timeout_seconds,
             )
             ctx.data["critic_a_verdict"] = final_crit_a.data.get("verdict", "PASS")
             ctx.data["any_major_issue"] = any(
@@ -303,6 +331,7 @@ class WorkflowOrchestrator:
                 "task_results": task_results,
                 "workflow_status": "DONE",
             },
+            timeout=self.options.reporter_timeout_seconds,
         )
         summary = report_result.data.get("summary", "(no summary)")
 
@@ -354,7 +383,11 @@ class WorkflowOrchestrator:
         attempts = 0
         while attempts <= self.options.max_repair_loops:
             attempts += 1
-            result = await self._agent(self.worker, envelope)
+            result = await self._agent(
+                self.worker,
+                envelope,
+                timeout=self.options.worker_timeout_seconds,
+            )
             if result.data.get("error"):
                 await self._bus_console(
                     "agent:worker",
@@ -413,6 +446,7 @@ class WorkflowOrchestrator:
                     "ask": f"检查：{summary}",
                     "files": [f.get("path", "?") for f in files],
                 },
+                timeout=self.options.critic_a_timeout_seconds,
             )
             verdict = crit.data.get("verdict", "PASS")
             if verdict == "PASS" or attempts > self.options.max_repair_loops:
@@ -454,13 +488,39 @@ class WorkflowOrchestrator:
             "files_modified": [],
         }
 
-    async def _agent(self, agent: Any, ctx: dict[str, Any]) -> AgentResult:
-        """Run an agent and publish a token-usage event."""
-        result = await agent.run(ctx)
-        # Publish a token usage event if we can infer the model.
-        # (For v0.2 we don't have per-call usage from the router; the
-        # agents don't currently emit it. Hook point for Phase 1.5.)
-        return result
+    async def _agent(
+        self,
+        agent: Any,
+        ctx: dict[str, Any],
+        timeout: float | None = None,
+    ) -> AgentResult:
+        """Run an agent and publish a token-usage event.
+
+        If `timeout` is set, the agent's run() is wrapped in
+        `asyncio.timeout`. On expiry, returns an AgentResult with
+        `error="timeout"`, `retryable=False`, `timeout_seconds=<value>`.
+        The orchestrator then handles the timeout like any other
+        agent error (marks task FAILED, moves on).
+        """
+        if timeout is None:
+            result = await agent.run(ctx)
+            return result
+        try:
+            async with asyncio.timeout(timeout):
+                result = await agent.run(ctx)
+            return result
+        except TimeoutError:
+            return AgentResult(
+                role=getattr(agent, "role", None),
+                data={
+                    "error": "timeout",
+                    "message": (
+                        f"agent exceeded {timeout:.0f}s working time"
+                    ),
+                    "timeout_seconds": timeout,
+                    "retryable": False,
+                },
+            )
 
     async def _t(self, event: str) -> None:
         """Fire a state machine transition."""
