@@ -184,3 +184,103 @@ def test_get_registry_singleton_has_builtins() -> None:
     assert "echo" in names
     assert "python" in names
     assert "git" in names
+
+
+def test_python_sandbox_does_not_inherit_secrets(monkeypatch) -> None:
+    """Python plugin must NOT pass API keys from os.environ to the
+    subprocess. Repro for the W2 finding: a Worker calling
+    `python {"code": "import os; print(os.environ['MINIMAX_API_KEY'])"}`
+    should NOT see the keychain-seeded secret."""
+    import os
+    from aco_runtime_lib.plugins.builtin.python import PythonPlugin
+
+    # Pretend the lifespan already seeded a fake secret into env.
+    monkeypatch.setenv("MINIMAX_API_KEY", "sk-secret-should-not-leak")
+
+    reg = PluginRegistry()
+    reg.register(PythonPlugin())
+    result = asyncio.run(
+        reg.invoke(
+            "python",
+            {"code": "import os; print('KEY=' + os.environ.get('MINIMAX_API_KEY', '<missing>'))"},
+        )
+    )
+    assert result["status"] == "ok"
+    # The subprocess must see <missing>, not the secret.
+    assert "KEY=<missing>" in result["stdout"], (
+        f"python plugin leaked API key into subprocess: {result['stdout']!r}"
+    )
+    assert "sk-secret-should-not-leak" not in result["stdout"]
+
+
+def test_python_sandbox_passes_explicit_allowlist(monkeypatch) -> None:
+    """When the caller passes env_allowlist, those vars DO get
+    inherited. Used to opt-in PATH extensions etc."""
+    from aco_runtime_lib.plugins.builtin.python import PythonPlugin
+
+    monkeypatch.setenv("MY_CUSTOM_VAR", "hello-from-parent")
+
+    reg = PluginRegistry()
+    reg.register(PythonPlugin())
+    result = asyncio.run(
+        reg.invoke(
+            "python",
+            {
+                "code": "import os; print(os.environ.get('MY_CUSTOM_VAR', '<missing>'))",
+                "env_allowlist": ["MY_CUSTOM_VAR"],
+            },
+        )
+    )
+    assert result["status"] == "ok"
+    assert "hello-from-parent" in result["stdout"]
+
+
+def test_python_sandbox_blocks_var_not_in_allowlist(monkeypatch) -> None:
+    from aco_runtime_lib.plugins.builtin.python import PythonPlugin
+
+    monkeypatch.setenv("SHOULD_NOT_LEAK", "secret")
+
+    reg = PluginRegistry()
+    reg.register(PythonPlugin())
+    result = asyncio.run(
+        reg.invoke(
+            "python",
+            {
+                "code": "import os; print(os.environ.get('SHOULD_NOT_LEAK', '<missing>'))",
+                "env_allowlist": ["PATH"],
+            },
+        )
+    )
+    assert "<missing>" in result["stdout"]
+
+
+def test_git_apply_is_write_op() -> None:
+    """W3 finding: 'apply' is missing from _READ_ONLY allowlist."""
+    from aco_runtime_lib.plugins.builtin.git import GitPlugin
+    reg = PluginRegistry()
+    reg.register(GitPlugin())
+    result = asyncio.run(reg.invoke("git", {"args": ["apply", "patch.diff"]}))
+    assert result["status"] == "error"
+    assert "confirm" in result["message"].lower()
+
+
+def test_git_clean_requires_confirm() -> None:
+    """`git clean -fdx` is destructive; must require confirm."""
+    from aco_runtime_lib.plugins.builtin.git import GitPlugin
+    reg = PluginRegistry()
+    reg.register(GitPlugin())
+    result = asyncio.run(
+        reg.invoke("git", {"args": ["clean", "-fdx"]})
+    )
+    assert result["status"] == "error"
+    assert "confirm" in result["message"].lower()
+
+
+def test_git_reset_requires_confirm() -> None:
+    from aco_runtime_lib.plugins.builtin.git import GitPlugin
+    reg = PluginRegistry()
+    reg.register(GitPlugin())
+    result = asyncio.run(
+        reg.invoke("git", {"args": ["reset", "--hard"]})
+    )
+    assert result["status"] == "error"

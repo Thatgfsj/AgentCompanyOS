@@ -185,10 +185,13 @@ class WorkflowOrchestrator:
         sm = StateMachine(ctx, self.bus, initial=State.REQ_RECEIVED)
         self._ctx = ctx
         self._sm = sm
-        # Hook the bus so on_event fires for every event (transitions
-        # + task_status + console + ...). This lets the API route
-        # capture plan data as soon as the planning phase completes
-        # and live-update per-task status, not just at workflow end.
+        # C3 TODO: the bus.publish monkey-patch below leaks
+        # across workflow runs (singleton EventBus accumulates an
+        # extra on_event handler per orchestrator instance). Today
+        # this is masked by the API route's _run_lock (which
+        # serializes workflows), so no observable bug. Cleanest fix
+        # is to replace the patch with an EventBus.subscribe()
+        # consumer in a background task; deferred to v0.3.
         if self.options.on_event:
             _orig_publish = self.bus.publish
             on_event = self.options.on_event
@@ -398,11 +401,18 @@ class WorkflowOrchestrator:
                 summary=summary,
                 task_results=task_results,
             )
-        # Unknown verdict — treat as PASS to avoid an infinite loop.
-        await self._t("final_review_pass")
+        # Unknown verdict (W1 fix) — treat as REJECT, not PASS. Don't
+        # deliver unverified work; fail safely and surface the
+        # unknown verdict to the user.
+        await self._t("final_review_reject")
+        await self._bus_console(
+            "agent:final_reviewer",
+            "error",
+            f"final_review unknown verdict: {verdict!r} -> REJECT",
+        )
         return OrchestratorResult(
             wf_id=wf_id,
-            final_state=sm.state,
+            final_state=State.FAILED,
             summary=summary,
             task_results=task_results,
         )

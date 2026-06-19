@@ -116,11 +116,28 @@ def reveal_secret(name: str) -> dict[str, str]:
     return {"name": name, "value": v}
 
 
+class SeedRequest(BaseModel):
+    """Body for POST /secrets/seed.
+
+    `overwrite` defaults to True: when the user explicitly
+    triggers a reseed, they want the keychain value to win over
+    any stale setx value. (The lifespan startup uses
+    overwrite=False so initial boot doesn't clobber setx.)
+    """
+    overwrite: bool = True
+
+
 @router.post("/secrets/seed", response_model=dict[str, list[str]])
-def seed_now(overwrite: bool = False) -> dict[str, list[str]]:
+def seed_now(body: SeedRequest = SeedRequest()) -> dict[str, list[str]]:
     """Re-seed os.environ from the keychain. Returns the names
     that were set. Useful after the user adds a new key via the
     Settings UI and wants the runtime to pick it up without a
-    restart."""
+    restart.
+
+    Pass {"overwrite": false} in the body to keep setx values
+    that are already in os.environ. The default is overwrite=true
+    because the explicit "reseed" intent is usually "I just set
+    a new value in the Settings UI, use it now."
+    """
     s = _store()
-    return {"seeded": s.seed_os_environ(overwrite=overwrite)}
+    return {"seeded": s.seed_os_environ(overwrite=body.overwrite)}

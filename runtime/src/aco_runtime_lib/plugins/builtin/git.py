@@ -29,10 +29,23 @@ _DEFAULT_TIMEOUT = 30.0
 # without an extra confirmation step. Write operations require
 # the caller to pass confirm=true.
 _READ_ONLY = frozenset({
+    # Inspection commands that don't mutate the repo.
     "status", "log", "diff", "show", "branch", "tag", "remote",
     "rev-parse", "ls-files", "ls-tree", "cat-file", "config",
-    "describe", "log", "shortlog", "stash", "tag", "blame",
-    "reflog",
+    "describe", "shortlog", "blame", "reflog", "log",
+    # `git grep` / `git diff-tree` / etc. -- read-only inspection.
+    "grep", "diff-tree", "diff-index",
+    # Anything not in this set (or in the explicit write list below)
+    # requires confirm=true. Default-deny, NOT allow-list.
+})
+
+# Explicit write op surface (anything NOT in this set AND NOT in
+# _READ_ONLY is REJECTED). Default-deny.
+_WRITE_OPS = frozenset({
+    "add", "commit", "push", "pull", "fetch", "merge", "rebase",
+    "reset", "checkout", "switch", "restore", "rm", "clean",
+    "cherry-pick", "revert", "apply", "init", "clone",
+    "branch",
 })
 
 
@@ -45,7 +58,7 @@ class GitPlugin(Plugin):
         "confirmation. Write commands (commit, push, ...) require "
         "confirm=true."
     )
-    actions = ["exec"] + sorted(_READ_ONLY) + ["commit", "push", "pull", "fetch", "add"]
+    actions = ["exec"] + sorted(_READ_ONLY | _WRITE_OPS)
 
     async def invoke(
         self, args: Mapping[str, Any], ctx: Mapping[str, Any] | None = None
