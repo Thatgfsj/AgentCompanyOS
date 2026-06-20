@@ -1,12 +1,9 @@
 /**
- * Robust API client with retry, health check, and connection management.
- *
- * All runtime API calls go through this module to ensure:
- * - Automatic retry on transient failures
- * - Health check before operations
- * - Connection status tracking
- * - Timeout handling
+ * API client using Tauri's HTTP plugin to bypass webview CSP.
  */
+
+import { invoke } from '@tauri-apps/api/core';
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 
 const RUNTIME_URL = 'http://127.0.0.1:7317';
 
@@ -16,7 +13,7 @@ type ConnectionState = 'unknown' | 'connected' | 'disconnected';
 
 let _connectionState: ConnectionState = 'unknown';
 let _lastHealthCheck = 0;
-const HEALTH_CHECK_INTERVAL = 5000; // 5s
+const HEALTH_CHECK_INTERVAL = 5000;
 
 export function getConnectionState(): ConnectionState {
   return _connectionState;
@@ -30,172 +27,95 @@ export function isConnected(): boolean {
 
 export async function checkHealth(): Promise<boolean> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
-
-    const r = await fetch(`${RUNTIME_URL}/health`, {
-      signal: controller.signal,
+    const r = await tauriFetch(`${RUNTIME_URL}/health`, {
+      method: 'GET',
+      timeout: 3,
     });
-    clearTimeout(timeout);
-
-    if (r.ok) {
+    if (r.status === 200) {
       _connectionState = 'connected';
       _lastHealthCheck = Date.now();
       return true;
     }
-  } catch {
+  } catch (err) {
     // ignore
   }
-
   _connectionState = 'disconnected';
   _lastHealthCheck = Date.now();
   return false;
 }
 
-/**
- * Ensure runtime is reachable. Retries up to `maxRetries` times with
- * exponential backoff. Returns true if connected, false if exhausted.
- */
 export async function ensureConnected(maxRetries = 3): Promise<boolean> {
-  // Skip if recently checked
   if (Date.now() - _lastHealthCheck < HEALTH_CHECK_INTERVAL && _connectionState === 'connected') {
     return true;
   }
-
   for (let i = 0; i <= maxRetries; i++) {
     if (await checkHealth()) return true;
-    if (i < maxRetries) {
-      await sleep(500 * Math.pow(2, i)); // 500ms, 1s, 2s
-    }
+    if (i < maxRetries) await sleep(500 * Math.pow(2, i));
   }
   return false;
 }
 
-// ── Fetch with retry ─────────────────────────────────────────────
+// ── Fetch helpers ────────────────────────────────────────────────
 
-interface FetchOptions extends RequestInit {
+interface FetchOptions {
+  method?: string;
+  body?: unknown;
   retries?: number;
-  retryDelay?: number;
   timeout?: number;
 }
 
-/**
- * Fetch with automatic retry on network errors and 5xx responses.
- */
-export async function fetchWithRetry(
-  url: string,
-  options: FetchOptions = {},
-): Promise<Response> {
-  const {
-    retries = 2,
-    retryDelay = 1000,
-    timeout = 30000,
-    ...fetchOpts
-  } = options;
+export async function fetchWithRetry(url: string, options: FetchOptions = {}): Promise<Response> {
+  const { method = 'GET', body, retries = 2, timeout = 30 } = options;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeout);
-
-      const response = await fetch(url, {
-        ...fetchOpts,
-        signal: controller.signal,
+      const r = await tauriFetch(url, {
+        method: method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+        body: body ? JSON.stringify(body) : undefined,
+        headers: body ? { 'content-type': 'application/json' } : undefined,
+        timeout,
       });
-      clearTimeout(timer);
-
-      // Don't retry on 4xx (client errors)
-      if (response.ok || (response.status >= 400 && response.status < 500)) {
-        _connectionState = 'connected';
-        return response;
-      }
-
-      // 5xx — retry
-      if (attempt < retries) {
-        console.warn(`[api] ${response.status} from ${url}, retrying (${attempt + 1}/${retries})...`);
-        await sleep(retryDelay * Math.pow(2, attempt));
-        continue;
-      }
-
       _connectionState = 'connected';
-      return response;
+      return r;
     } catch (err) {
       if (attempt < retries) {
-        console.warn(`[api] fetch failed for ${url}, retrying (${attempt + 1}/${retries})...`, err);
-        await sleep(retryDelay * Math.pow(2, attempt));
+        await sleep(1000 * Math.pow(2, attempt));
         continue;
       }
       _connectionState = 'disconnected';
       throw err;
     }
   }
-
   throw new Error('unreachable');
 }
 
-/**
- * Convenience: GET with retry, returns parsed JSON.
- */
 export async function getJson<T>(path: string, opts?: FetchOptions): Promise<T> {
-  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, {
-    method: 'GET',
-    ...opts,
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
-  return r.json() as Promise<T>;
+  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { ...opts, method: 'GET' });
+  if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
+  return r.data as T;
 }
 
-/**
- * Convenience: POST with retry, returns parsed JSON.
- */
 export async function postJson<T>(path: string, body: unknown, opts?: FetchOptions): Promise<T> {
-  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    ...opts,
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
-  return r.json() as Promise<T>;
+  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { ...opts, method: 'POST', body });
+  if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
+  return r.data as T;
 }
 
-/**
- * Convenience: PUT with retry.
- */
 export async function putJson<T>(path: string, body: unknown, opts?: FetchOptions): Promise<T> {
-  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    ...opts,
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
-  return r.json() as Promise<T>;
+  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { ...opts, method: 'PUT', body });
+  if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
+  return r.data as T;
 }
 
-/**
- * Convenience: PATCH with retry.
- */
 export async function patchJson<T>(path: string, body: unknown, opts?: FetchOptions): Promise<T> {
-  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    ...opts,
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
-  return r.json() as Promise<T>;
+  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { ...opts, method: 'PATCH', body });
+  if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
+  return r.data as T;
 }
 
-/**
- * Convenience: DELETE with retry.
- */
 export async function deleteReq(path: string, opts?: FetchOptions): Promise<void> {
-  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, {
-    method: 'DELETE',
-    ...opts,
-  });
-  if (!r.ok && r.status !== 404) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { ...opts, method: 'DELETE' });
+  if (r.status < 200 || (r.status >= 300 && r.status !== 404)) throw new Error(`HTTP ${r.status}`);
 }
 
 // ── WebSocket with reconnect ─────────────────────────────────────
@@ -209,20 +129,8 @@ export interface WsOptions {
   reconnectDelay?: number;
 }
 
-/**
- * Create a WebSocket connection with automatic reconnect.
- * Returns a cleanup function.
- */
 export function createWebSocket(path: string, options: WsOptions): () => void {
-  const {
-    onMessage,
-    onOpen,
-    onClose,
-    onError,
-    maxReconnects = 10,
-    reconnectDelay = 1000,
-  } = options;
-
+  const { onMessage, onOpen, onClose, onError, maxReconnects = 10, reconnectDelay = 1000 } = options;
   let ws: WebSocket | null = null;
   let reconnectCount = 0;
   let disposed = false;
@@ -230,15 +138,9 @@ export function createWebSocket(path: string, options: WsOptions): () => void {
 
   function connect() {
     if (disposed) return;
-
     try {
       ws = new WebSocket(`${RUNTIME_URL.replace('http', 'ws')}${path}`);
-
-      ws.onopen = () => {
-        reconnectCount = 0;
-        onOpen?.();
-      };
-
+      ws.onopen = () => { reconnectCount = 0; onOpen?.(); };
       ws.onmessage = (ev) => {
         try {
           const data = JSON.parse(ev.data);
@@ -248,58 +150,42 @@ export function createWebSocket(path: string, options: WsOptions): () => void {
           console.warn('[ws] bad message:', e);
         }
       };
-
       ws.onclose = () => {
         onClose?.();
         if (!disposed && reconnectCount < maxReconnects) {
           reconnectCount++;
           const delay = Math.min(reconnectDelay * Math.pow(2, reconnectCount - 1), 10000);
-          console.warn(`[ws] disconnected, reconnecting in ${delay}ms (${reconnectCount}/${maxReconnects})`);
           reconnectTimer = setTimeout(connect, delay);
         }
       };
-
-      ws.onerror = (err) => {
-        onError?.(err);
-      };
+      ws.onerror = (err) => { onError?.(err); };
     } catch (e) {
       console.error('[ws] failed to connect:', e);
     }
   }
 
   connect();
-
   return () => {
     disposed = true;
     if (reconnectTimer) clearTimeout(reconnectTimer);
-    if (ws) {
-      ws.close();
-      ws = null;
-    }
+    if (ws) { ws.close(); ws = null; }
   };
 }
 
 // ── Polling helper ───────────────────────────────────────────────
 
-/**
- * Poll a condition until it returns true or timeout.
- * Returns true if condition met, false if timed out.
- */
 export async function pollUntil(
   condition: () => Promise<boolean>,
   options: { interval?: number; timeout?: number } = {},
 ): Promise<boolean> {
   const { interval = 1000, timeout = 60000 } = options;
   const deadline = Date.now() + timeout;
-
   while (Date.now() < deadline) {
     if (await condition()) return true;
     await sleep(interval);
   }
   return false;
 }
-
-// ── Helpers ──────────────────────────────────────────────────────
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));

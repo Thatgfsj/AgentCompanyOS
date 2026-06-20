@@ -142,6 +142,19 @@ async fn cancel_workflow(
     Ok(())
 }
 
+#[tauri::command]
+fn write_log(level: String, message: String) {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    let log_path = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("frontend.log")))
+        .unwrap_or_else(|| std::path::PathBuf::from("frontend.log"));
+    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(log_path) {
+        let _ = writeln!(f, "[{}] {}", level, message);
+    }
+}
+
 fn workflow_to_json(wf: storage::Workflow) -> serde_json::Value {
     serde_json::json!({
         "id": wf.id,
@@ -168,6 +181,7 @@ fn workflow_to_json(wf: storage::Workflow) -> serde_json::Value {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_http::init())
         .setup(|app| {
             let handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
@@ -187,7 +201,7 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![start_workflow_cmd, get_workflow, cancel_workflow])
+        .invoke_handler(tauri::generate_handler![start_workflow_cmd, get_workflow, cancel_workflow, write_log])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
