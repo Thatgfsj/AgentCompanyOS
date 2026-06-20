@@ -1,0 +1,33 @@
+{
+  "verdict": "REPAIR",
+  "confidence": 0.97,
+  "issue_count": 3,
+  "issues": [
+    {
+      "id": 1,
+      "severity": "MAJOR",
+      "location": "read_user, line building sql",
+      "description": "SQL injection via f-string interpolation of user_id directly into the query string. An attacker-controlled user_id (e.g., '1 OR 1=1' or '1; DROP TABLE users; --') is concatenated into raw SQL and executed. This is a textbook injection hole.",
+      "reproduction": "read_user(\"1 OR 1=1\") returns all rows. read_user(\"1; DROP TABLE users; --\") drops the table on drivers that stack statements.",
+      "fix": "Use a parameterized query: db.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,)). Never interpolate untrusted input into SQL."
+    },
+    {
+      "id": 2,
+      "severity": "MAJOR",
+      "location": "divide_numbers, expression a / b",
+      "description": "ZeroDivisionError raised when b == 0 (or b == 0.0). Division by zero is a routine runtime crash in any caller that doesn't pre-filter zero denominators.",
+      "reproduction": "divide_numbers(1, 0) -> ZeroDivisionError. divide_numbers(1, 0.0) -> ZeroDivisionError (Python 3).",
+      "fix": "Guard explicitly: if b == 0: raise ValueError(\"divisor must be non-zero\") (or return a sentinel if that's the API contract). Do not silently swallow."
+    },
+    {
+      "id": 3,
+      "severity": "MINOR",
+      "location": "parse_age, int(s) call",
+      "description": "ValueError on any non-integer string (\"\", \"3.14\", \"abc\", \" \"). TypeError on None. No type/format validation. Edge case, but likely to hit on common bad input from forms or external sources.",
+      "reproduction": "parse_age(\"\") -> ValueError. parse_age(\"3.14\") -> ValueError. parse_age(None) -> TypeError.",
+      "fix": "Validate before converting, or wrap in try/except and raise a domain-specific error (e.g., ValueError(\"age must be a non-negative integer\"))."
+    }
+  ],
+  "summary_first_500": "Two MAJOR issues: SQL injection in read_user (unparameterized f-string query) and unhandled ZeroDivisionError in divide_numbers. One MINOR: parse_age crashes on non-integer or None input without a domain-specific error. Must repair before merge.",
+  "summary_total_chars": 245
+}

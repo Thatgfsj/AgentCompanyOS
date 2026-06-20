@@ -38,6 +38,9 @@
     "externalBin": [
       "binaries/aco_runtime"
     ],
+    "resources": [
+      "../../../target/release/WebView2Loader.dll"
+    ],
     "publisher": "Thatgfsj"
   }
 }

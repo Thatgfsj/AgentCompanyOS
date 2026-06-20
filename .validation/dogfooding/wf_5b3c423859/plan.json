@@ -1,0 +1,351 @@
+{
+  "id": "wf_5b3c423859",
+  "parsed_plan": {
+    "title": "Plan: Add `inspect` CLI subcommand to aco_runtime_lib",
+    "goal": "Provide a `python -m aco_runtime_lib inspect <wf_id>` CLI subcommand that reads a workflow's persisted JSONL log and prints its history (summary, plan, task statuses, and chronological events). Support `--summary`, `--events`, and `--plan` flags for section selection, and ship pytest tests covering the new functionality.",
+    "architecture": "- The existing `__main__.py` uses `argparse` with subparsers; add a new `inspect` subparser.\n- New module `aco_runtime_lib/inspector.py` exposes:\n  - `load_log(wf_id, log_dir=None) -> Iterator[dict]` ¡ª streams parsed JSONL events.\n  - `build_report(wf_id, log_dir=None) -> Report` ¡ª aggregates events into a structured report.\n  - `format_summary(report)`, `format_plan(report)`, `format_events(report)` ¡ª render each section for stdout.\n- The `inspect` subcommand wires argparse ¡ú `build_report` ¡ú the selected `format_*` calls.\n- Log file location follows the existing convention (e.g., `logs/<wf_id>.jsonl`); reuse the current path resolver if one exists, otherwise introduce a small resolver in `inspector.py`.\n- Tests live in `tests/test_inspect.py` using `tmp_path` for synthetic JSONL logs and `capsys` / `subprocess` for CLI assertions.",
+    "nodes": [
+      {
+        "id": "T1",
+        "title": "Locate existing CLI entry point, argparse pattern, and JSONL log path resolver",
+        "owner_role": "backend",
+        "depends_on": [],
+        "est_tokens": 800
+      },
+      {
+        "id": "T2",
+        "title": "Implement `inspector.py` with `load_log`, `build_report`, and `Report` dataclass",
+        "owner_role": "backend",
+        "depends_on": [
+          "T1"
+        ],
+        "est_tokens": 2500
+      },
+      {
+        "id": "T3",
+        "title": "Add `inspect` subparser to `__main__.py` and wire `--summary`, `--events`, `--plan` flags",
+        "owner_role": "backend",
+        "depends_on": [
+          "T1",
+          "T2"
+        ],
+        "est_tokens": 1800
+      },
+      {
+        "id": "T4",
+        "title": "Implement section formatters (summary, plan, events) with stable output",
+        "owner_role": "backend",
+        "depends_on": [
+          "T2"
+        ],
+        "est_tokens": 1500
+      },
+      {
+        "id": "T5",
+        "title": "Write pytest tests covering module functions, each flag, defaults, and error paths",
+        "owner_role": "qa",
+        "depends_on": [
+          "T2",
+          "T3",
+          "T4"
+        ],
+        "est_tokens": 2500
+      },
+      {
+        "id": "T6",
+        "title": "Document the new subcommand in README and CLI reference",
+        "owner_role": "docs",
+        "depends_on": [
+          "T3",
+          "T4"
+        ],
+        "est_tokens": 800
+      }
+    ],
+    "edges": [
+      {
+        "from_": "T1",
+        "to": "T2",
+        "kind": "Hard"
+      },
+      {
+        "from_": "T1",
+        "to": "T3",
+        "kind": "Hard"
+      },
+      {
+        "from_": "T2",
+        "to": "T3",
+        "kind": "Hard"
+      },
+      {
+        "from_": "T2",
+        "to": "T4",
+        "kind": "Hard"
+      },
+      {
+        "from_": "T2",
+        "to": "T5",
+        "kind": "Hard"
+      },
+      {
+        "from_": "T3",
+        "to": "T5",
+        "kind": "Hard"
+      },
+      {
+        "from_": "T4",
+        "to": "T5",
+        "kind": "Hard"
+      },
+      {
+        "from_": "T3",
+        "to": "T6",
+        "kind": "Hard"
+      },
+      {
+        "from_": "T4",
+        "to": "T6",
+        "kind": "Hard"
+      }
+    ],
+    "apis": [],
+    "data_model": [
+      {
+        "name": "Summary",
+        "change_type": "add",
+        "description": "`{status, started_at, ended_at, duration_s, total_tasks, completed, failed}`"
+      },
+      {
+        "name": "TaskStatus",
+        "change_type": "add",
+        "description": "`{task_id, state: pending|running|completed|failed, started_at, ended_at}`"
+      },
+      {
+        "name": "Plan",
+        "change_type": "add",
+        "description": "`{tasks: [{id, title, owner, depends_on}]}`"
+      }
+    ],
+    "acceptance": [
+      {
+        "id": "ac-1",
+        "description": "`python -m aco_runtime_lib inspect <wf_id>` runs and prints summary, plan, and events sections in that order when no flags are supplied.",
+        "test": null,
+        "automated": false
+      },
+      {
+        "id": "ac-2",
+        "description": "Each of `--summary`, `--events`, `--plan` prints only its section when supplied alone; multiple flags combine and the sections are printed in summary ¡ú plan ¡ú events order.",
+        "test": null,
+        "automated": false
+      },
+      {
+        "id": "ac-3",
+        "description": "The subcommand appears in `python -m aco_runtime_lib inspect --help` with usage examples.",
+        "test": null,
+        "automated": false
+      },
+      {
+        "id": "ac-4",
+        "description": "An unknown `wf_id` (missing log file) exits with code `3` and prints a clear error to stderr.",
+        "test": null,
+        "automated": false
+      },
+      {
+        "id": "ac-5",
+        "description": "A malformed JSONL line is reported with its line number on stderr, and processing continues for subsequent lines; exit code is `4` only if no usable events could be extracted.",
+        "test": null,
+        "automated": false
+      },
+      {
+        "id": "ac-6",
+        "description": "Task statuses reflect the latest event per task (`started` ¡ú `completed` or `failed`); tasks never started remain `pending`.",
+        "test": null,
+        "automated": false
+      },
+      {
+        "id": "ac-7",
+        "description": "Summary correctly computes total/completed/failed counts and duration from `workflow_start` / `workflow_end` timestamps.",
+        "test": null,
+        "automated": false
+      },
+      {
+        "id": "ac-8",
+        "description": "`pytest tests/test_inspect.py` passes with coverage of: empty log, full happy-path log, partial log (no `workflow_end`), missing log file, malformed line, each flag combination, default (no flags) output.",
+        "test": null,
+        "automated": false
+      },
+      {
+        "id": "ac-9",
+        "description": "README documents the subcommand, its flags, default behavior, and exit codes.",
+        "test": null,
+        "automated": false
+      }
+    ],
+    "risks": [],
+    "out_of_scope": [
+      "Live tailing or streaming of in-progress workflows.",
+      "Filtering events by type, time range, or task id.",
+      "Exporting reports to JSON, HTML, or other formats.",
+      "Mutating, rewriting, or compacting the log.",
+      "Authentication or access control on log files.",
+      "A `--tail N`, `--since`, `--until`, or `--json` output mode (left for a follow-up)."
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Locate existing CLI entry point and JSONL log path resolver",
+      "owner_role": "backend",
+      "depends_on": [],
+      "est_tokens": 800
+    },
+    {
+      "id": "T2",
+      "title": "Implement `inspector.py` with `load_log` and `build_report`",
+      "owner_role": "backend",
+      "depends_on": [
+        "T1"
+      ],
+      "est_tokens": 2500
+    },
+    {
+      "id": "T3",
+      "title": "Add `inspect` subparser to `__main__.py` and wire flags",
+      "owner_role": "backend",
+      "depends_on": [
+        "T1",
+        "T2"
+      ],
+      "est_tokens": 1800
+    },
+    {
+      "id": "T4",
+      "title": "Implement section formatters (summary, events, plan)",
+      "owner_role": "backend",
+      "depends_on": [
+        "T2"
+      ],
+      "est_tokens": 1500
+    },
+    {
+      "id": "T5",
+      "title": "Write pytest tests for inspector module and CLI",
+      "owner_role": "qa",
+      "depends_on": [
+        "T2",
+        "T3",
+        "T4"
+      ],
+      "est_tokens": 2500
+    },
+    {
+      "id": "T6",
+      "title": "Document the new subcommand in README and CLI reference",
+      "owner_role": "docs",
+      "depends_on": [
+        "T3",
+        "T4"
+      ],
+      "est_tokens": 800
+    },
+    {
+      "id": "T1",
+      "title": "Locate existing CLI entry point, argparse pattern, and JSONL log path resolver",
+      "owner_role": "backend",
+      "depends_on": [],
+      "est_tokens": 800
+    },
+    {
+      "id": "T2",
+      "title": "Implement `inspector.py` with `load_log`, `build_report`, and `Report` dataclass",
+      "owner_role": "backend",
+      "depends_on": [
+        "T1"
+      ],
+      "est_tokens": 2500
+    },
+    {
+      "id": "T3",
+      "title": "Add `inspect` subparser to `__main__.py` and wire `--summary`, `--events`, `--plan` flags",
+      "owner_role": "backend",
+      "depends_on": [
+        "T1",
+        "T2"
+      ],
+      "est_tokens": 1800
+    },
+    {
+      "id": "T4",
+      "title": "Implement section formatters (summary, plan, events) with stable output",
+      "owner_role": "backend",
+      "depends_on": [
+        "T2"
+      ],
+      "est_tokens": 1500
+    },
+    {
+      "id": "T5",
+      "title": "Write pytest tests covering module functions, each flag, defaults, and error paths",
+      "owner_role": "qa",
+      "depends_on": [
+        "T2",
+        "T3",
+        "T4"
+      ],
+      "est_tokens": 2500
+    },
+    {
+      "id": "T6",
+      "title": "Document the new subcommand in README and CLI reference",
+      "owner_role": "docs",
+      "depends_on": [
+        "T3",
+        "T4"
+      ],
+      "est_tokens": 800
+    }
+  ],
+  "task_statuses": {
+    "T1": {
+      "status": "DONE",
+      "title": "Locate existing CLI entry point, argparse pattern, and JSONL log path resolver",
+      "summary": "could not parse worker output: <think>The user is asking me to locate existing CLI entry point, argparse pattern, and JSONL log path resolver in some codebase. However, I haven't been provided with any codebase context, file paths,",
+      "files": []
+    },
+    "T2": {
+      "status": "DONE",
+      "title": "Implement `inspector.py` with `load_log`, `build_report`, and `Report` dataclass",
+      "summary": "could not parse worker output: <think>The user wants me to implement an `inspector.py` module with three components: `load_log`, `build_report`, and a `Report` dataclass. However, the task description is missing some critical infor",
+      "files": []
+    },
+    "T3": {
+      "status": "DONE",
+      "title": "Add `inspect` subparser to `__main__.py` and wire `--summary`, `--events`, `--plan` flags",
+      "summary": "could not parse worker output: <think>\nThe user is asking me to perform a task related to modifying a `__main__.py` file to add an `inspect` subparser with `--summary`, `--events`, and `--plan` flags. However, I don't have access t",
+      "files": []
+    },
+    "T4": {
+      "status": "RUNNING",
+      "title": "Implement section formatters (summary, plan, events) with stable output",
+      "summary": null,
+      "files": []
+    },
+    "T5": {
+      "status": "DONE",
+      "title": "Write pytest tests for inspector module and CLI",
+      "summary": "could not parse worker output: <think>\nThe user is asking me to write pytest tests for an \"inspector module\" and CLI, but I don't have any context about what code exists. There's no actual code provided, no file paths, no module st",
+      "files": []
+    },
+    "T6": {
+      "status": "DONE",
+      "title": "Document the new subcommand in README and CLI reference",
+      "summary": "could not parse worker output: <think>\nThe user has provided a task envelope for documenting a new subcommand in README and CLI reference, but there's no actual context about what subcommand needs to be documented. The task descrip",
+      "files": []
+    }
+  },
+  "parse_error": null,
+  "validation_error": null,
+  "status": "ready"
+}
