@@ -4,105 +4,74 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::Manager;
-use tauri::path::BaseDirectory;
+use tauri_plugin_shell::ShellExt;
 use tauri_core::{start_workflow, AppState, NewWorkflowRequest, NewWorkflowResponse};
 
-/// v0.2.3: Spawn the bundled Python runtime sidecar and wait for
-/// it to be reachable on 127.0.0.1:7317. The exe ships with the
-/// installer (bundle.externalBin in tauri.conf.json). If the
-/// runtime is already running (e.g. dev mode with `aco-runtime`
-/// in a terminal), we leave it alone.
-fn spawn_runtime_sidecar(handle: &tauri::AppHandle) {
+/// v0.2.3: Spawn the bundled Python runtime sidecar via the shell
+/// plugin and wait for it to be reachable on 127.0.0.1:7317.
+fn spawn_runtime_sidecar(app: &tauri::AppHandle) {
     use std::time::{Duration, Instant};
     const HEALTH_URL: &str = "http://127.0.0.1:7317/health";
-    const SIDECAR_NAME: &str = "aco_runtime";
 
     // Already up?
-    if ureq_get_status(HEALTH_URL, Duration::from_millis(200)).is_some() {
-        tracing::info!("runtime already running on 7317, skipping sidecar spawn");
+    if ureq_get_status(HEALTH_URL, Duration::from_millis(500)).is_some() {
+        println!("[aco] runtime already running on 7317, skipping sidecar spawn");
         return;
     }
 
-    let resource_path = match handle.path().resolve(SIDECAR_NAME, BaseDirectory::Resource) {
-        Ok(p) => p,
+    println!("[aco] runtime not running, spawning sidecar...");
+
+    // Use the shell plugin to launch the sidecar
+    let sidecar_command = match app.shell().sidecar("aco_runtime") {
+        Ok(cmd) => cmd,
         Err(e) => {
-            tracing::warn!(
-                "sidecar resource '{}' not found ({}); runtime will not start. \
-                 Run `aco-runtime` in a terminal manually.",
-                SIDECAR_NAME, e
-            );
+            eprintln!("[aco] failed to create sidecar command: {}", e);
             return;
         }
     };
 
-    tracing::info!("spawning runtime sidecar at {:?}", resource_path);
+    match sidecar_command.spawn() {
+        Ok((mut rx, child)) => {
+            println!("[aco] runtime sidecar spawned, pid={:?}", child.pid());
 
-    // Verify the sidecar exists
-    if !resource_path.exists() {
-        tracing::error!(
-            "sidecar binary does not exist at {:?}. \
-             Check that externalBin is configured correctly in tauri.conf.json",
-            resource_path
-        );
-        return;
-    }
+            // Drain sidecar stdout/stderr in background
+            tauri::async_runtime::spawn(async move {
+                use tauri_plugin_shell::process::CommandEvent;
+                while let Some(event) = rx.recv().await {
+                    match event {
+                        CommandEvent::Stdout(line) => {
+                            println!("[sidecar] {}", String::from_utf8_lossy(&line));
+                        }
+                        CommandEvent::Stderr(line) => {
+                            eprintln!("[sidecar:err] {}", String::from_utf8_lossy(&line));
+                        }
+                        CommandEvent::Terminated(status) => {
+                            eprintln!("[sidecar] terminated with status: {:?}", status);
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            });
 
-    let mut cmd = std::process::Command::new(&resource_path);
-    if let Some(parent) = resource_path.parent() {
-        cmd.current_dir(parent);
-    }
-    // Capture stderr for debugging, detach stdin/stdout.
-    match cmd.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-    {
-        Ok(mut child) => {
-            tracing::info!("runtime sidecar pid={}", child.id());
-            // Poll /health for up to 30s before giving up.
+            // Poll /health for up to 30s
             let deadline = Instant::now() + Duration::from_secs(30);
             while Instant::now() < deadline {
                 if ureq_get_status(HEALTH_URL, Duration::from_millis(500)).is_some() {
-                    tracing::info!("runtime sidecar is healthy");
+                    println!("[aco] runtime sidecar is healthy!");
                     return;
                 }
-                // Check if process exited
-                match child.try_wait() {
-                    Ok(Some(status)) => {
-                        tracing::error!("runtime sidecar exited early with status: {}", status);
-                        // Try to read stderr
-                        if let Some(mut stderr) = child.stderr.take() {
-                            let mut output = String::new();
-                            use std::io::Read;
-                            let _ = stderr.read_to_string(&mut output);
-                            if !output.is_empty() {
-                                tracing::error!("sidecar stderr: {}", output);
-                            }
-                        }
-                        return;
-                    }
-                    Ok(None) => {
-                        // Still running
-                    }
-                    Err(e) => {
-                        tracing::warn!("failed to check sidecar status: {}", e);
-                    }
-                }
-                std::thread::sleep(Duration::from_millis(250));
+                std::thread::sleep(Duration::from_millis(500));
             }
-            tracing::warn!("runtime sidecar did not become healthy in 30s");
-            // Kill the stuck process
-            let _ = child.kill();
+            eprintln!("[aco] runtime sidecar did not become healthy in 30s");
         }
         Err(e) => {
-            tracing::error!("failed to spawn sidecar: {}", e);
+            eprintln!("[aco] failed to spawn sidecar: {}", e);
         }
     }
 }
 
 fn ureq_get_status(url: &str, timeout: std::time::Duration) -> Option<u16> {
-    // Minimal synchronous HTTP GET — avoid pulling in a crate.
-    // Falls back to None on any error (treated as "not ready").
     use std::io::{Read, Write};
     use std::net::{SocketAddr, TcpStream};
     let url = url.strip_prefix("http://")?;
@@ -158,7 +127,6 @@ async fn cancel_workflow(
     _state: tauri::State<'_, AppState>,
     _id: String,
 ) -> Result<(), String> {
-    // Stub for Phase 0. Real impl in Phase 1.
     Ok(())
 }
 
@@ -191,19 +159,16 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
-                // v0.2.3: spawn the Python runtime sidecar so users
-                // don't need to install Python themselves. The exe
-                // ships with the installer (bundle.externalBin) and
-                // listens on 127.0.0.1:7317. We poll /health for up
-                // to 30s before giving up. AppState::build() talks
-                // to this same endpoint.
+                // Spawn the Python runtime sidecar
                 spawn_runtime_sidecar(&handle);
+
+                // Build AppState (connects to the runtime)
                 match AppState::build().await {
                     Ok(state) => {
                         handle.manage(state);
                     }
                     Err(e) => {
-                        tracing::error!(error = %e, "failed to build AppState");
+                        eprintln!("[aco] failed to build AppState: {}", e);
                         std::process::exit(1);
                     }
                 }
