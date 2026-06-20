@@ -93,3 +93,4 @@ out/
 *.AppImage
 Cargo.lock
 Cargo.lock
+apps/desktop/src-tauri/binaries/
