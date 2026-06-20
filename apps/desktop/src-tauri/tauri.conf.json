@@ -22,9 +22,7 @@
         "center": true
       }
     ],
-    "security": {
-      "csp": null
-    }
+    "security": {}
   },
   "bundle": {
     "active": true,
