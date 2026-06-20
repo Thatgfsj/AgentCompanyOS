@@ -176,12 +176,24 @@ export function App() {
     };
   }, [currentWfId]);
 
-  // Probe the runtime on mount to decide real vs simulator.
+  // Probe the runtime on mount with extended retry.
+  // Sidecar may take 5-10s to start, so we retry aggressively.
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
-      const ok = await ensureConnected(2);
-      setBackendMode(ok ? 'real' : 'simulator');
+      // Wait up to 30s for runtime to become available
+      for (let i = 0; i < 15; i++) {
+        if (cancelled) return;
+        const ok = await ensureConnected(1);
+        if (ok) {
+          if (!cancelled) setBackendMode('real');
+          return;
+        }
+        await new Promise(r => setTimeout(r, 2000));
+      }
+      if (!cancelled) setBackendMode('simulator');
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const reset = () => {
