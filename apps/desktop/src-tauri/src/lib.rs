@@ -13,7 +13,19 @@ fn spawn_runtime_sidecar(app: &tauri::AppHandle) {
     use std::time::{Duration, Instant};
     const HEALTH_URL: &str = "http://127.0.0.1:7317/health";
 
-    // Already up?
+    // Kill any existing aco_runtime processes first
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("taskkill")
+            .args(["/f", "/im", "aco_runtime.exe"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        // Wait for port to be released
+        std::thread::sleep(Duration::from_millis(1000));
+    }
+
+    // Already up? (e.g. dev mode)
     if ureq_get_status(HEALTH_URL, Duration::from_millis(500)).is_some() {
         println!("[aco] runtime already running on 7317, skipping sidecar spawn");
         return;
