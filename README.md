@@ -128,8 +128,8 @@ Settings UI) to see the same flow with real LLM calls.
 
 ## 🏗️ Status
 
-**Current version:** [`v0.2.2`](https://github.com/Thatgfsj/AgentCompanyOS/releases/tag/v0.2.2)
-(Phase 2 partial: parser + validator + scheduler shipped; full Phase 2 in progress.)
+**Current version:** [`v0.2.3`](https://github.com/Thatgfsj/AgentCompanyOS/releases/tag/v0.2.3)
+(Phase 2 complete: task graph + multi-provider + plugins.)
 
 | Milestone | Status |
 |-----------|--------|
@@ -138,18 +138,36 @@ Settings UI) to see the same flow with real LLM calls.
 | Phase 2.1 — Plan parser (Markdown → DAG, strict mode) | ✅ Done |
 | Phase 2.2 — Plan validator (cycles, budget, max-nodes) | ✅ Done |
 | Phase 2.3 — Plan scheduler (topological, fair, repair subgraph) | ✅ Done |
-| Phase 2.4 — React Flow UI for plan graph | 🛠 In progress |
-| Phase 2.5+ — Memory + cost dashboard + marketplace | ⏳ Planned |
+| Phase 2.4 — React Flow UI for plan graph | ✅ Done |
+| Phase 2.5–2.10 — Multi-provider failover | ✅ Done |
+| Phase 2.11–2.12 — Failover chain + retry | ✅ Done |
+| Phase 2.13–2.17 — Plugin system (git/python/docker/mcp) + UI | ✅ Done |
+| Phase 2.18 — Per-task console + task tree | ✅ Done |
+| Phase 3 — Memory + replay + cost dashboard | ⏳ Planned |
 | v1.0 — Complete AI Software Company | 🎯 Target |
 
-**Verified working end-to-end (v0.2.2):**
-- 153 runtime tests passing
+**Verified working end-to-end (v0.2.3):**
+- 155 runtime tests passing
 - Workflow `POST /api/workflow` → plan → workers → FinalReviewer → DONE
 - `GET /api/workflow/{id}/plan` returns live `parsed_plan` + `task_statuses`
-- OS-keychain secret store (Windows Credential Manager / macOS Keychain)
-- Structured Plugin system (`echo`, `python`, `git`) with sandbox + default-deny write
-- Per-agent timeouts (`*_timeout_seconds`) prevent local-model self-lock
-- Windows installer: NSIS 3.6 MB + MSI 5.0 MB at [Release v0.2.2](https://github.com/Thatgfsj/AgentCompanyOS/releases/tag/v0.2.2)
+- React Flow plan graph visualization
+- 5 built-in plugins (echo, python, git, docker, mcp)
+- Per-task console + task tree UI
+- OS-keychain secret store (Windows Credential Manager)
+- Bundled Python runtime — **no Python installation required**
+- Windows installer: NSIS 39 MB + MSI 40 MB
+
+## 📦 Installation (Windows)
+
+1. Download the NSIS installer (`Agent Company OS_x.x.x_x64-setup.exe`) from [Releases](https://github.com/Thatgfsj/AgentCompanyOS/releases)
+2. Run the installer
+3. If Windows SmartScreen shows a warning:
+   - Click **"More info"**
+   - Click **"Run anyway"**
+   - This is expected for unsigned applications
+4. Launch "Agent Company OS" from the Start Menu
+
+> **No Python installation required** — the Python runtime is bundled in the installer.
 
 See [plans/](./plans/) and [docs/ROADMAP.md](./docs/ROADMAP.md) for details.
 
