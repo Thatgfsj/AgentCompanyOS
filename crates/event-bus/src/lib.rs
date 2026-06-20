@@ -264,7 +264,10 @@ mod tests {
         })
         .await
         .expect("publish should succeed");
-        let event = sub.recv().expect("recv should succeed");
+        let event = tokio::task::spawn_blocking(move || sub.recv())
+            .await
+            .expect("spawn_blocking should succeed")
+            .expect("recv should succeed");
         match event {
             WfEvent::Milestone { label, .. } => assert_eq!(label, "✓ test"),
             other => panic!("unexpected event: {other:?}"),
