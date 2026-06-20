@@ -3,8 +3,6 @@ import { PhaseTimeline, AgentCard, Card, type PhaseState, type AgentStatus } fro
 import type { WfEvent } from '@aco/shared';
 import { TopBar } from './zones/TopBar.js';
 import { LeftRoster } from './zones/LeftRoster.js';
-// CenterPanel removed: the Plan tab + ReasoningBubble replace the
-// dedicated center view (see PR #2).
 import { RightPanel } from './zones/RightPanel.js';
 import { BottomConsole } from './zones/BottomConsole.js';
 import { CommandDock } from './zones/CommandDock.js';
@@ -13,6 +11,9 @@ import { PluginsPanel } from './zones/PluginsPanel.js';
 import { ReasoningBubble } from '@aco/ui';
 import { ReviewVerdict } from '@aco/ui';
 import { PlanGraph, type PlanTaskNode, type PlanEdge } from './components/PlanGraph.js';
+import { ConnectionBanner } from './components/ConnectionBanner.js';
+import { ensureConnected, getJson, postJson, createWebSocket, pollUntil } from './lib/api.js';
+import { useConnection } from './lib/useConnection.js';
 
 interface Phase {
   name:
@@ -78,17 +79,12 @@ const INITIAL_AGENT_STATUS: AgentStatusMap = {
   worker: 'idle',
 };
 
-const RUNTIME_URL = 'http://127.0.0.1:7317';
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 function agentStatusToRole(s: AgentStatus): AgentStatus {
   return s;
 }
 
 export function App() {
+  const { connected } = useConnection(3000);
   const [activePhase, setActivePhase] = useState(0);
   const [phaseStates, setPhaseStates] = useState<Record<Phase['name'], PhaseState>>({ ...PHASE_STATE });
   const [tasks, setTasks] = useState<TaskRow[]>([...INITIAL_TASKS]);
@@ -124,58 +120,54 @@ export function App() {
   useEffect(() => {
     if (!currentWfId) return;
     let cancelled = false;
-    let attempts = 0;
     const poll = async () => {
-      while (!cancelled && attempts < 60) {
-        attempts += 1;
-        try {
-          const r = await fetch(`${RUNTIME_URL}/api/workflow/${currentWfId}/plan`);
-          if (r.ok) {
-            const data = await r.json();
-            if (cancelled) return;
-            if (data?.status === 'ready' && data.parsed_plan?.nodes) {
-              const rows: TaskRow[] = data.parsed_plan.nodes.map(
-                (n: { id: string; title: string; owner_role?: string }) => ({
-                  id: n.id,
-                  title: n.title,
-                  owner: n.owner_role ?? '',
-                  fileHint: undefined,
+      try {
+        const data = await getJson<Record<string, unknown>>(`/api/workflow/${currentWfId}/plan`, {
+          retries: 5,
+          retryDelay: 2000,
+          timeout: 10000,
+        });
+        if (cancelled) return;
+        const parsedPlan = data?.parsed_plan as Record<string, unknown> | undefined;
+        if (data?.status === 'ready' && parsedPlan?.nodes) {
+              const nodes = parsedPlan.nodes as Array<Record<string, unknown>>;
+              const rows: TaskRow[] = nodes.map(
+                (n): TaskRow => ({
+                  id: n.id as string,
+                  title: n.title as string,
+                  owner: (n.owner_role as string) ?? '',
                   state: 'PENDING',
                 }),
               );
               setTasks(rows);
 
               // Set plan graph data
-              const graphNodes: PlanTaskNode[] = data.parsed_plan.nodes.map(
-                (n: { id: string; title: string; owner_role?: string; depends_on?: string[]; est_tokens?: number }) => ({
-                  id: n.id,
-                  title: n.title,
-                  owner_role: n.owner_role ?? 'default',
-                  depends_on: n.depends_on ?? [],
+              const graphNodes: PlanTaskNode[] = nodes.map(
+                (n): PlanTaskNode => ({
+                  id: n.id as string,
+                  title: n.title as string,
+                  owner_role: (n.owner_role as string) ?? 'default',
+                  depends_on: (n.depends_on as string[]) ?? [],
                   status: 'PENDING',
-                  est_tokens: n.est_tokens,
                 }),
               );
               setPlanNodes(graphNodes);
 
               // Set edges
-              const graphEdges: PlanEdge[] = data.parsed_plan.edges?.map(
-                (e: { from_: string; to: string; kind?: string }) => ({
-                  from: e.from_,
-                  to: e.to,
-                  kind: e.kind ?? 'Hard',
+              const edges = parsedPlan.edges as Array<Record<string, unknown>> | undefined;
+              const graphEdges: PlanEdge[] = edges?.map(
+                (e): PlanEdge => ({
+                  from: e.from_ as string,
+                  to: e.to as string,
+                  kind: ((e.kind as string) ?? 'Hard') as 'Hard' | 'Soft',
                 }),
               ) ?? [];
               setPlanEdges(graphEdges);
 
               setShowPlanGraph(true);
-              return;
-            }
-          }
-        } catch {
-          // fall through and retry
         }
-        await new Promise((r) => setTimeout(r, 1000));
+      } catch {
+        // API call failed, will retry on next workflow start
       }
     };
     void poll();
@@ -187,16 +179,8 @@ export function App() {
   // Probe the runtime on mount to decide real vs simulator.
   useEffect(() => {
     void (async () => {
-      try {
-        const r = await fetch(`${RUNTIME_URL}/api/state`, { signal: AbortSignal.timeout(2000) });
-        if (r.ok) {
-          setBackendMode('real');
-          return;
-        }
-      } catch {
-        // fall through
-      }
-      setBackendMode('simulator');
+      const ok = await ensureConnected(2);
+      setBackendMode(ok ? 'real' : 'simulator');
     })();
   }, []);
 
@@ -308,69 +292,50 @@ export function App() {
     setPhaseStates({ ...PHASE_STATE });
     setAgentStatus({ ...INITIAL_AGENT_STATUS });
 
-    // Open the WebSocket with auto-reconnect. If the socket dies
-    // mid-run, the polling loop will still detect completion; the
-    // reconnect lets us catch any *late* events for visual feedback.
-    let ws: WebSocket | null = null;
-    let reconnectAttempts = 0;
-    const connect = () => {
-      ws = new WebSocket(`ws://127.0.0.1:7317/api/events/stream`);
-      wsRef.current = ws;
-      ws.onmessage = (ev) => {
-        try {
-          const data = JSON.parse(ev.data) as Record<string, unknown>;
-          if (data.kind === 'heartbeat') return;
-          applyEvent(data as unknown as WfEvent);
-        } catch (e) {
-          console.warn('bad event', e);
-        }
-      };
-      ws.onclose = () => {
-        if (busyRef.current && reconnectAttempts < 5) {
-          reconnectAttempts += 1;
-          const delay = Math.min(500 * 2 ** reconnectAttempts, 5_000);
-          window.setTimeout(connect, delay);
-        }
-      };
-      ws.onerror = () => {
-        // onclose will follow
-      };
-    };
-    connect();
+    // Open the WebSocket with auto-reconnect
+    const cleanupWs = createWebSocket('/api/events/stream', {
+      onMessage: (data) => applyEvent(data as WfEvent),
+      maxReconnects: 10,
+      reconnectDelay: 1000,
+    });
 
-    // POST the workflow
+    // POST the workflow with retry
     try {
-      const resp = await fetch(`${RUNTIME_URL}/api/workflow`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text, speed: 'fast' }),
+      const data = await postJson<{ id: string }>('/api/workflow', { text, speed: 'fast' }, {
+        retries: 3,
+        timeout: 30000,
       });
-      const data = (await resp.json()) as { id: string };
       setCurrentWfId(data.id);
 
       // Poll for completion
-      const poll = async () => {
-        try {
-          const r = await fetch(`${RUNTIME_URL}/api/workflow/${data.id}/summary`);
-          if (r.ok) {
-            const summary = (await r.json()) as { summary: string };
+      const done = await pollUntil(
+        async () => {
+          try {
+            const summary = await getJson<{ summary: string }>(`/api/workflow/${data.id}/summary`, {
+              retries: 1,
+              timeout: 5000,
+            });
             setFinalReport(summary.summary);
             setReviewVerdict({ verdict: 'PASS', summary: '工作流已完成' });
-            busyRef.current = false;
-            setBusy(false);
-            setCompleted(true);
-            return;
+            return true;
+          } catch {
+            return false;
           }
-        } catch {
-          // ignore
-        }
-        window.setTimeout(() => void poll(), 1000);
-      };
-      void poll();
+        },
+        { interval: 2000, timeout: 600000 },
+      );
+
+      if (!done) {
+        setReviewVerdict({ verdict: 'REPAIR', summary: '工作流超时' });
+      }
     } catch (e) {
       console.warn('workflow POST failed', e);
+      setReviewVerdict({ verdict: 'REPAIR', summary: `工作流启动失败: ${e}` });
+    } finally {
       busyRef.current = false;
       setBusy(false);
+      setCompleted(true);
+      cleanupWs();
     }
   };
 
@@ -390,7 +355,7 @@ export function App() {
         ...prev,
         {
           kind: 'console',
-          ts: nowIso(),
+          ts: new Date().toISOString(),
           agent_id: 'agent:system',
           level: 'warn',
           message: `runtime 未启动，请先运行 apps/runtime（python -m aco_runtime.main）`,
@@ -414,12 +379,14 @@ export function App() {
             ? '上次工作流已完成'
             : busy
               ? '运行中…'
-              : backendMode === 'simulator'
-                ? '未连接 runtime（启动 Python 端以启用 AI）'
-                : '示例工作流：实现登录接口'
+              : connected
+                ? '已连接 runtime · 准备就绪'
+                : '未连接 runtime'
         }
         onSettingsClick={() => setSettingsOpen(true)}
       />
+
+      <ConnectionBanner />
 
       <div className="flex flex-1 overflow-hidden">
         <aside
