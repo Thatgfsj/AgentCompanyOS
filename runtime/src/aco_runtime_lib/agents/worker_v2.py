@@ -25,54 +25,54 @@ from aco_runtime_lib.providers.base import (
 )
 from aco_runtime_lib.providers.router import ModelRouter
 
-WORKER_SYSTEM_PROMPT_V2 = """\
-You are a Worker in Agent Company OS. You MUST write actual code files.
-
-CRITICAL RULES:
-1. Write ALL code in markdown code blocks with filenames
-2. Use this EXACT format for each file:
-
-```python:filename.py
-def hello():
-    return "Hello World"
-```
-
-3. After writing all code blocks, return a TASK_RESULT JSON:
-
-```json
-{"task_id": "TASK_ID_HERE", "status": "DONE", "summary": "what you did"}
-```
-
-Example - if asked to create hello.py with a hello function:
-
-I will create hello.py with the hello function.
-
-```python:hello.py
-def hello(name="World"):
-    """Return a greeting."""
-    return f"Hello, {name}!"
-```
-
-```python:test_hello.py
-from hello import hello
-
-def test_hello_default():
-    assert hello() == "Hello, World!"
-
-def test_hello_name():
-    assert hello("Alice") == "Hello, Alice!"
-```
-
-```json
-{"task_id": "T1", "status": "DONE", "summary": "Created hello.py and test_hello.py"}
-```
-
-IMPORTANT:
-- Always use the format ```language:filename.ext for code blocks
-- Include the filename after the colon
-- Write complete, runnable code
-- Include tests when appropriate
-"""
+WORKER_SYSTEM_PROMPT_V2 = (
+    "You are a Worker in Agent Company OS. You MUST write actual code files.\n"
+    "\n"
+    "CRITICAL RULES:\n"
+    "1. Write ALL code in markdown code blocks with filenames\n"
+    "2. Use this EXACT format for each file:\n"
+    "\n"
+    "~~~python:filename.py\n"
+    "def hello():\n"
+    '    return "Hello World"\n'
+    "~~~\n"
+    "\n"
+    "3. After writing all code blocks, return a TASK_RESULT JSON:\n"
+    "\n"
+    '~~~json\n'
+    '{"task_id": "TASK_ID_HERE", "status": "DONE", "summary": "what you did"}\n'
+    "~~~\n"
+    "\n"
+    "Example - if asked to create hello.py with a hello function:\n"
+    "\n"
+    "I will create hello.py with the hello function.\n"
+    "\n"
+    "~~~python:hello.py\n"
+    'def hello(name="World"):\n'
+    '    """Return a greeting."""\n'
+    '    return f"Hello, {name}!"\n'
+    "~~~\n"
+    "\n"
+    "~~~python:test_hello.py\n"
+    "from hello import hello\n"
+    "\n"
+    "def test_hello_default():\n"
+    '    assert hello() == "Hello, World!"\n'
+    "\n"
+    "def test_hello_name():\n"
+    '    assert hello("Alice") == "Hello, Alice!"\n'
+    "~~~\n"
+    "\n"
+    '~~~json\n'
+    '{"task_id": "T1", "status": "DONE", "summary": "Created hello.py and test_hello.py"}\n'
+    "~~~\n"
+    "\n"
+    "IMPORTANT:\n"
+    "- Always use the format ~~~language:filename.ext for code blocks\n"
+    "- Include the filename after the colon\n"
+    "- Write complete, runnable code\n"
+    "- Include tests when appropriate\n"
+)
 
 
 class WorkerAgentV2(Agent):
@@ -160,18 +160,15 @@ class WorkerAgentV2(Agent):
         """Extract code blocks with filenames from markdown.
 
         Matches patterns like:
+            ~~~python:hello.py
+            code here
+            ~~~
             ```python:hello.py
             code here
             ```
-            ```js:src/app.js
-            code here
-            ```
-            ```hello.py
-            code here
-            ```
         """
-        # Pattern: ```lang:filename\n...\n```  OR  ```filename\n...\n```
-        pattern = r'```(?:\w+:)?([^\n`]+)\n(.*?)```'
+        # Pattern: ~~~ or ``` followed by lang:filename, code, then closing ~~~ or ```
+        pattern = r'(?:~~~|```)(?:\w+:)?([^\n`~]+)\n(.*?)(?:~~~|```)'
         matches = re.findall(pattern, content, re.DOTALL)
 
         results = []

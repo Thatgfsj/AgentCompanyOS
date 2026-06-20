@@ -10,6 +10,8 @@ app_runtime_src = os.path.join(spec_dir, 'src')
 hiddenimports = ['aco_runtime_lib', 'aco_runtime']
 hiddenimports += collect_submodules('aco_runtime_lib')
 hiddenimports += collect_submodules('aco_runtime')
+# Explicitly add worker_v2 in case collect_submodules misses it
+hiddenimports += ['aco_runtime_lib.agents.worker_v2']
 
 a = Analysis(
     [os.path.join(runtime_src, 'aco_runtime_lib', '__main__.py')],
