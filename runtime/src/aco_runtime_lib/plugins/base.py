@@ -151,14 +151,18 @@ def get_registry() -> PluginRegistry:
     """Lazily build the registry with built-in plugins loaded."""
     global _registry
     if _registry is None:
+        from aco_runtime_lib.plugins.builtin.docker import DockerPlugin
         from aco_runtime_lib.plugins.builtin.echo import EchoPlugin
         from aco_runtime_lib.plugins.builtin.git import GitPlugin
+        from aco_runtime_lib.plugins.builtin.mcp import MCPPlugin
         from aco_runtime_lib.plugins.builtin.python import PythonPlugin
 
         _registry = PluginRegistry()
         _registry.register(EchoPlugin())
         _registry.register(PythonPlugin())
         _registry.register(GitPlugin())
+        _registry.register(DockerPlugin())
+        _registry.register(MCPPlugin())
     return _registry
 
 

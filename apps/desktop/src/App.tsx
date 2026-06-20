@@ -9,6 +9,7 @@ import { RightPanel } from './zones/RightPanel.js';
 import { BottomConsole } from './zones/BottomConsole.js';
 import { CommandDock } from './zones/CommandDock.js';
 import { Settings } from './zones/Settings.js';
+import { PluginsPanel } from './zones/PluginsPanel.js';
 import { ReasoningBubble } from '@aco/ui';
 import { ReviewVerdict } from '@aco/ui';
 import { PlanGraph, type PlanTaskNode, type PlanEdge } from './components/PlanGraph.js';
@@ -541,6 +542,9 @@ export function App() {
           aria-label="任务面板"
         >
           <RightPanel tasks={tasks} />
+          <div className="mt-3">
+            <PluginsPanel />
+          </div>
         </aside>
       </div>
 
