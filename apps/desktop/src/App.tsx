@@ -12,7 +12,8 @@ import { ReasoningBubble } from '@aco/ui';
 import { ReviewVerdict } from '@aco/ui';
 import { PlanGraph, type PlanTaskNode, type PlanEdge } from './components/PlanGraph.js';
 import { ConnectionBanner } from './components/ConnectionBanner.js';
-import { ensureConnected, getJson, postJson, createWebSocket, pollUntil } from './lib/api.js';
+import { StartupScreen } from './components/StartupScreen.js';
+import { getJson, postJson, createWebSocket, pollUntil } from './lib/api.js';
 import { useConnection } from './lib/useConnection.js';
 
 interface Phase {
@@ -85,6 +86,7 @@ function agentStatusToRole(s: AgentStatus): AgentStatus {
 
 export function App() {
   const { connected } = useConnection(3000);
+  const [ready, setReady] = useState(false);
   const [activePhase, setActivePhase] = useState(0);
   const [phaseStates, setPhaseStates] = useState<Record<Phase['name'], PhaseState>>({ ...PHASE_STATE });
   const [tasks, setTasks] = useState<TaskRow[]>([...INITIAL_TASKS]);
@@ -100,7 +102,6 @@ export function App() {
   } | null>(null);
   const [finalReport, setFinalReport] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [backendMode, setBackendMode] = useState<'real' | 'simulator' | 'unknown'>('unknown');
   const [currentWfId, setCurrentWfId] = useState<string | null>(null);
   const [planNodes, setPlanNodes] = useState<PlanTaskNode[]>([]);
   const [planEdges, setPlanEdges] = useState<PlanEdge[]>([]);
@@ -108,6 +109,11 @@ export function App() {
   const [showPlanGraph, setShowPlanGraph] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const busyRef = useRef(false);
+
+  // Show startup screen until runtime is ready
+  if (!ready) {
+    return <StartupScreen onReady={() => setReady(true)} />;
+  }
   // Expose for screenshot / debug scripts.
   useEffect(() => {
     // @ts-expect-error: window.__acoCurrentWfId is a debug hook
@@ -175,26 +181,6 @@ export function App() {
       cancelled = true;
     };
   }, [currentWfId]);
-
-  // Probe the runtime on mount with extended retry.
-  // Sidecar may take 5-10s to start, so we retry aggressively.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      // Wait up to 30s for runtime to become available
-      for (let i = 0; i < 15; i++) {
-        if (cancelled) return;
-        const ok = await ensureConnected(1);
-        if (ok) {
-          if (!cancelled) setBackendMode('real');
-          return;
-        }
-        await new Promise(r => setTimeout(r, 2000));
-      }
-      if (!cancelled) setBackendMode('simulator');
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   const reset = () => {
     if (wsRef.current) {
@@ -358,22 +344,7 @@ export function App() {
     }
     const text = cmd.trim() || '实现 POST /auth/login 接口';
     setCmd('');
-    if (backendMode === 'real') {
-      void startRealWorkflow(text);
-    } else {
-      // Simulator fallback not implemented in this revision; show
-      // a console line and stay in idle.
-      setEvents((prev) => [
-        ...prev,
-        {
-          kind: 'console',
-          ts: new Date().toISOString(),
-          agent_id: 'agent:system',
-          level: 'warn',
-          message: `runtime 未启动，请先运行 apps/runtime（python -m aco_runtime.main）`,
-        },
-      ]);
-    }
+    void startRealWorkflow(text);
   };
 
   useEffect(() => {
