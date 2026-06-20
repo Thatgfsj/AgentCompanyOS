@@ -102,7 +102,7 @@ async fn start_workflow_cmd(
     state: tauri::State<'_, AppState>,
     req: NewWorkflowRequest,
 ) -> Result<NewWorkflowResponse, String> {
-    start_workflow(state, req).await.map_err(|e| e)
+    start_workflow(state, req).await
 }
 
 #[tauri::command]

@@ -259,7 +259,7 @@ pub enum ConfigError {
         path: PathBuf,
         /// Underlying error.
         #[source]
-        source: toml::de::Error,
+        source: Box<toml::de::Error>,
     },
     /// YAML parse error.
     #[error("yaml parse error in {path}: {source}")]
@@ -268,7 +268,7 @@ pub enum ConfigError {
         path: PathBuf,
         /// Underlying error.
         #[source]
-        source: serde_yaml::Error,
+        source: Box<serde_yaml::Error>,
     },
     /// Config refers to an unknown provider.
     #[error("router references unknown provider: {0}")]
@@ -280,7 +280,7 @@ pub fn load_aco_config(path: &Path) -> Result<AcoConfig, ConfigError> {
     let text = std::fs::read_to_string(path)?;
     let cfg: AcoConfig = toml::from_str(&text).map_err(|source| ConfigError::Toml {
         path: path.to_path_buf(),
-        source,
+        source: Box::new(source),
     })?;
     Ok(cfg)
 }
@@ -290,7 +290,7 @@ pub fn load_providers_config(path: &Path) -> Result<ProvidersConfig, ConfigError
     let text = std::fs::read_to_string(path)?;
     let cfg: ProvidersConfig = toml::from_str(&text).map_err(|source| ConfigError::Toml {
         path: path.to_path_buf(),
-        source,
+        source: Box::new(source),
     })?;
     Ok(cfg)
 }
@@ -300,7 +300,7 @@ pub fn load_router_config(path: &Path) -> Result<RouterConfig, ConfigError> {
     let text = std::fs::read_to_string(path)?;
     let cfg: RouterConfig = toml::from_str(&text).map_err(|source| ConfigError::Toml {
         path: path.to_path_buf(),
-        source,
+        source: Box::new(source),
     })?;
     Ok(cfg)
 }

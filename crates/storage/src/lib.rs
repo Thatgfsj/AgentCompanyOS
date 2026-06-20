@@ -228,7 +228,7 @@ impl From<WorkflowRow> for Workflow {
             final_status: r
                 .final_status
                 .as_deref()
-                .and_then(WorkflowStatus_from_str),
+                .and_then(workflow_status_from_str),
             total_input_tokens: r.total_input_tokens,
             total_output_tokens: r.total_output_tokens,
             total_cost_usd: r.total_cost_usd,
@@ -236,7 +236,7 @@ impl From<WorkflowRow> for Workflow {
     }
 }
 
-fn WorkflowStatus_from_str(s: &str) -> Option<WorkflowStatus> {
+fn workflow_status_from_str(s: &str) -> Option<WorkflowStatus> {
     match s {
         "ACTIVE" => Some(WorkflowStatus::Active),
         "DONE" => Some(WorkflowStatus::Done),
