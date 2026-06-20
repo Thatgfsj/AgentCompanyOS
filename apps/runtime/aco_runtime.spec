@@ -1,13 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 from PyInstaller.utils.hooks import collect_submodules
 
-hiddenimports = ['aco_runtime_lib']
-hiddenimports += collect_submodules('aco_runtime_lib')
+# Get absolute paths
+spec_dir = os.path.dirname(os.path.abspath(SPEC))
+runtime_src = os.path.join(spec_dir, '..', '..', 'runtime', 'src')
+app_runtime_src = os.path.join(spec_dir, 'src')
 
+hiddenimports = ['aco_runtime_lib', 'aco_runtime']
+hiddenimports += collect_submodules('aco_runtime_lib')
+hiddenimports += collect_submodules('aco_runtime')
 
 a = Analysis(
-    ['..\\..\\runtime\\src\\aco_runtime_lib\\__main__.py'],
-    pathex=['../../runtime/src'],
+    [os.path.join(runtime_src, 'aco_runtime_lib', '__main__.py')],
+    pathex=[runtime_src, app_runtime_src],
     binaries=[],
     datas=[],
     hiddenimports=hiddenimports,

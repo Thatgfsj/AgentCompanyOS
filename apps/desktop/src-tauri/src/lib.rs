@@ -36,17 +36,28 @@ fn spawn_runtime_sidecar(handle: &tauri::AppHandle) {
     };
 
     tracing::info!("spawning runtime sidecar at {:?}", resource_path);
+
+    // Verify the sidecar exists
+    if !resource_path.exists() {
+        tracing::error!(
+            "sidecar binary does not exist at {:?}. \
+             Check that externalBin is configured correctly in tauri.conf.json",
+            resource_path
+        );
+        return;
+    }
+
     let mut cmd = std::process::Command::new(&resource_path);
     if let Some(parent) = resource_path.parent() {
         cmd.current_dir(parent);
     }
-    // Detach: don't hold a stdio handle on the GUI process.
+    // Capture stderr for debugging, detach stdin/stdout.
     match cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
         .spawn()
     {
-        Ok(child) => {
+        Ok(mut child) => {
             tracing::info!("runtime sidecar pid={}", child.id());
             // Poll /health for up to 30s before giving up.
             let deadline = Instant::now() + Duration::from_secs(30);
@@ -55,12 +66,36 @@ fn spawn_runtime_sidecar(handle: &tauri::AppHandle) {
                     tracing::info!("runtime sidecar is healthy");
                     return;
                 }
+                // Check if process exited
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        tracing::error!("runtime sidecar exited early with status: {}", status);
+                        // Try to read stderr
+                        if let Some(mut stderr) = child.stderr.take() {
+                            let mut output = String::new();
+                            use std::io::Read;
+                            let _ = stderr.read_to_string(&mut output);
+                            if !output.is_empty() {
+                                tracing::error!("sidecar stderr: {}", output);
+                            }
+                        }
+                        return;
+                    }
+                    Ok(None) => {
+                        // Still running
+                    }
+                    Err(e) => {
+                        tracing::warn!("failed to check sidecar status: {}", e);
+                    }
+                }
                 std::thread::sleep(Duration::from_millis(250));
             }
             tracing::warn!("runtime sidecar did not become healthy in 30s");
+            // Kill the stuck process
+            let _ = child.kill();
         }
         Err(e) => {
-            tracing::warn!("failed to spawn sidecar: {}", e);
+            tracing::error!("failed to spawn sidecar: {}", e);
         }
     }
 }
