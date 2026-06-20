@@ -2,7 +2,6 @@
  * API client using Tauri's HTTP plugin to bypass webview CSP.
  */
 
-import { invoke } from '@tauri-apps/api/core';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 
 const RUNTIME_URL = 'http://127.0.0.1:7317';
@@ -29,14 +28,13 @@ export async function checkHealth(): Promise<boolean> {
   try {
     const r = await tauriFetch(`${RUNTIME_URL}/health`, {
       method: 'GET',
-      timeout: 3,
     });
     if (r.status === 200) {
       _connectionState = 'connected';
       _lastHealthCheck = Date.now();
       return true;
     }
-  } catch (err) {
+  } catch {
     // ignore
   }
   _connectionState = 'disconnected';
@@ -57,26 +55,30 @@ export async function ensureConnected(maxRetries = 3): Promise<boolean> {
 
 // ── Fetch helpers ────────────────────────────────────────────────
 
-interface FetchOptions {
-  method?: string;
-  body?: unknown;
-  retries?: number;
-  timeout?: number;
-}
-
-export async function fetchWithRetry(url: string, options: FetchOptions = {}): Promise<Response> {
-  const { method = 'GET', body, retries = 2, timeout = 30 } = options;
+export async function fetchWithRetry(
+  url: string,
+  options: { method?: string; body?: unknown; retries?: number } = {},
+): Promise<{ status: number; data: unknown }> {
+  const { method = 'GET', body, retries = 2 } = options;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const r = await tauriFetch(url, {
+      const fetchOptions: RequestInit = {
         method: method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-        body: body ? JSON.stringify(body) : undefined,
-        headers: body ? { 'content-type': 'application/json' } : undefined,
-        timeout,
-      });
+      };
+      if (body !== undefined) {
+        fetchOptions.body = JSON.stringify(body);
+        fetchOptions.headers = { 'content-type': 'application/json' };
+      }
+      const r = await tauriFetch(url, fetchOptions);
       _connectionState = 'connected';
-      return r;
+      let data: unknown = null;
+      try {
+        data = await (r as Response).json();
+      } catch {
+        // response might not have JSON body
+      }
+      return { status: r.status, data };
     } catch (err) {
       if (attempt < retries) {
         await sleep(1000 * Math.pow(2, attempt));
@@ -89,33 +91,22 @@ export async function fetchWithRetry(url: string, options: FetchOptions = {}): P
   throw new Error('unreachable');
 }
 
-export async function getJson<T>(path: string, opts?: FetchOptions): Promise<T> {
-  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { ...opts, method: 'GET' });
+export async function getJson<T>(path: string): Promise<T> {
+  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { method: 'GET' });
   if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
   return r.data as T;
 }
 
-export async function postJson<T>(path: string, body: unknown, opts?: FetchOptions): Promise<T> {
-  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { ...opts, method: 'POST', body });
+export async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { method: 'POST', body });
   if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
   return r.data as T;
 }
 
-export async function putJson<T>(path: string, body: unknown, opts?: FetchOptions): Promise<T> {
-  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { ...opts, method: 'PUT', body });
+export async function putJson<T>(path: string, body: unknown): Promise<T> {
+  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { method: 'PUT', body });
   if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
   return r.data as T;
-}
-
-export async function patchJson<T>(path: string, body: unknown, opts?: FetchOptions): Promise<T> {
-  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { ...opts, method: 'PATCH', body });
-  if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
-  return r.data as T;
-}
-
-export async function deleteReq(path: string, opts?: FetchOptions): Promise<void> {
-  const r = await fetchWithRetry(`${RUNTIME_URL}${path}`, { ...opts, method: 'DELETE' });
-  if (r.status < 200 || (r.status >= 300 && r.status !== 404)) throw new Error(`HTTP ${r.status}`);
 }
 
 // ── WebSocket with reconnect ─────────────────────────────────────
@@ -146,8 +137,8 @@ export function createWebSocket(path: string, options: WsOptions): () => void {
           const data = JSON.parse(ev.data);
           if (data.kind === 'heartbeat') return;
           onMessage(data);
-        } catch (e) {
-          console.warn('[ws] bad message:', e);
+        } catch {
+          // ignore
         }
       };
       ws.onclose = () => {
@@ -159,8 +150,8 @@ export function createWebSocket(path: string, options: WsOptions): () => void {
         }
       };
       ws.onerror = (err) => { onError?.(err); };
-    } catch (e) {
-      console.error('[ws] failed to connect:', e);
+    } catch {
+      // ignore
     }
   }
 

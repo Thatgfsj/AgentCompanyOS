@@ -113,11 +113,7 @@ export function App() {
     let cancelled = false;
     const poll = async () => {
       try {
-        const data = await getJson<Record<string, unknown>>(`/api/workflow/${currentWfId}/plan`, {
-          retries: 5,
-          retryDelay: 2000,
-          timeout: 10000,
-        });
+        const data = await getJson<Record<string, unknown>>(`/api/workflow/${currentWfId}/plan`);
         if (cancelled) return;
         const parsedPlan = data?.parsed_plan as Record<string, unknown> | undefined;
         if (data?.status === 'ready' && parsedPlan?.nodes) {
@@ -252,19 +248,13 @@ export function App() {
     });
 
     try {
-      const data = await postJson<{ id: string }>('/api/workflow', { text, speed: 'fast' }, {
-        retries: 3,
-        timeout: 30000,
-      });
+      const data = await postJson<{ id: string }>('/api/workflow', { text, speed: 'fast' });
       setCurrentWfId(data.id);
 
       const done = await pollUntil(
         async () => {
           try {
-            const summary = await getJson<{ summary: string }>(`/api/workflow/${data.id}/summary`, {
-              retries: 1,
-              timeout: 5000,
-            });
+            const summary = await getJson<{ summary: string }>(`/api/workflow/${data.id}/summary`);
             setFinalReport(summary.summary);
             setReviewVerdict({ verdict: 'PASS', summary: '工作流已完成' });
             return true;

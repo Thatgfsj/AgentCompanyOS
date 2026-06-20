@@ -1,5 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@aco/ui';
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+
+const API = 'http://127.0.0.1:7317';
+
+async function apiFetch(path: string, options: { method?: string; body?: unknown } = {}) {
+  const { method = 'GET', body } = options;
+  const fetchOptions: RequestInit = {
+    method: method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  };
+  if (body !== undefined) {
+    fetchOptions.body = JSON.stringify(body);
+    fetchOptions.headers = { 'content-type': 'application/json' };
+  }
+  return tauriFetch(`${API}${path}`, fetchOptions);
+}
 
 // ── Quick Add AI ─────────────────────────────────────────────────
 
@@ -126,7 +141,7 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
     setError(null);
     try {
       const r = await fetch(
-        `http://127.0.0.1:7317/api/settings/secrets/${provider.envVar}`,
+        `/api/settings/secrets/${provider.envVar}`,
         {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
@@ -136,7 +151,7 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
 
       // Re-inject to os.environ
-      await fetch('http://127.0.0.1:7317/api/settings/secrets/seed', {
+      await apiFetch('/api/settings/secrets/seed', {
         method: 'POST',
       });
 
@@ -169,7 +184,7 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
 
       // Save API key to keychain
       const r = await fetch(
-        `http://127.0.0.1:7317/api/settings/secrets/${envVar}`,
+        `/api/settings/secrets/${envVar}`,
         {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
@@ -193,7 +208,7 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
       localStorage.setItem(CUSTOM_PROVIDERS_KEY, JSON.stringify(customProviders));
 
       // Re-inject to os.environ
-      await fetch('http://127.0.0.1:7317/api/settings/secrets/seed', {
+      await apiFetch('/api/settings/secrets/seed', {
         method: 'POST',
       });
 
@@ -529,7 +544,7 @@ function SecretsView({ onSaved }: { onSaved: () => void }) {
 
   const load = async () => {
     try {
-      const r = await fetch('http://127.0.0.1:7317/api/settings/secrets');
+      const r = await apiFetch('/api/settings/secrets');
       setSecrets((await r.json()) as SecretInfo[]);
     } catch (e) {
       setError(`load failed: ${e}`);
@@ -546,7 +561,7 @@ function SecretsView({ onSaved }: { onSaved: () => void }) {
     setError(null);
     try {
       const r = await fetch(
-        `http://127.0.0.1:7317/api/settings/secrets/${name}`,
+        `/api/settings/secrets/${name}`,
         {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
@@ -571,7 +586,7 @@ function SecretsView({ onSaved }: { onSaved: () => void }) {
     setError(null);
     try {
       const r = await fetch(
-        `http://127.0.0.1:7317/api/settings/secrets/${name}`,
+        `/api/settings/secrets/${name}`,
         { method: 'DELETE' }
       );
       if (!r.ok && r.status !== 404) throw new Error(`HTTP ${r.status}`);
@@ -587,7 +602,7 @@ function SecretsView({ onSaved }: { onSaved: () => void }) {
   const reveal = async (name: string) => {
     try {
       const r = await fetch(
-        `http://127.0.0.1:7317/api/settings/secrets/${name}/reveal`,
+        `/api/settings/secrets/${name}/reveal`,
         { method: 'POST' }
       );
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -603,7 +618,7 @@ function SecretsView({ onSaved }: { onSaved: () => void }) {
     setError(null);
     try {
       await fetch(
-        'http://127.0.0.1:7317/api/settings/secrets/seed',
+        '/api/settings/secrets/seed',
         { method: 'POST' }
       );
       onSaved();
@@ -803,15 +818,15 @@ export function Settings({ open, onClose }: SettingsProps) {
     void (async () => {
       try {
         const [provResp, rolesResp] = await Promise.all([
-          fetch('http://127.0.0.1:7317/api/providers'),
-          fetch('http://127.0.0.1:7317/api/router/roles'),
+          apiFetch('/api/providers'),
+          apiFetch('/api/router/roles'),
         ]);
         const provData = (await provResp.json()) as {
           providers: ProviderInfo[];
           roles: RoleInfo[];
         };
         const rolesData = (await rolesResp.json()) as { roles: RoleInfo[] };
-        const modelsResp = await fetch('http://127.0.0.1:7317/api/router/models');
+        const modelsResp = await apiFetch('/api/router/models');
         const modelsData = (await modelsResp.json()) as {
           models: { provider: string; provider_display: string; model: string; display_name: string }[];
         };
@@ -834,10 +849,9 @@ export function Settings({ open, onClose }: SettingsProps) {
   const toggle = async (id: string, enabled: boolean) => {
     setSaving(true);
     try {
-      await fetch(`http://127.0.0.1:7317/api/providers/${id}`, {
+      await apiFetch(`/api/providers/${id}`, {
         method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ enabled }),
+        body: { enabled },
       });
       setSnapshot((prev) => ({
         ...prev,
@@ -854,10 +868,9 @@ export function Settings({ open, onClose }: SettingsProps) {
       const newRoles = snapshot.roles.map((r) =>
         r.role === role ? { ...r, default_model: model } : r,
       );
-      await fetch('http://127.0.0.1:7317/api/router/roles', {
+      await apiFetch('/api/router/roles', {
         method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ roles: newRoles }),
+        body: { roles: newRoles },
       });
       setSnapshot((prev) => ({ ...prev, roles: newRoles }));
       setSavedAt(new Date().toLocaleTimeString());
@@ -926,9 +939,9 @@ export function Settings({ open, onClose }: SettingsProps) {
                 void (async () => {
                   try {
                     const [prov, roles, models] = await Promise.all([
-                      fetch('http://127.0.0.1:7317/api/providers').then((r) => r.json() as Promise<{providers: ProviderInfo[]; roles: RoleInfo[]}>),
-                      fetch('http://127.0.0.1:7317/api/router/roles').then((r) => r.json() as Promise<{roles: RoleInfo[]}>),
-                      fetch('http://127.0.0.1:7317/api/router/models').then((r) => r.json() as Promise<{models: RuntimeSnapshot["available_models"]}>),
+                      apiFetch('/api/providers').then((r) => r.json() as Promise<{providers: ProviderInfo[]; roles: RoleInfo[]}>),
+                      apiFetch('/api/router/roles').then((r) => r.json() as Promise<{roles: RoleInfo[]}>),
+                      apiFetch('/api/router/models').then((r) => r.json() as Promise<{models: RuntimeSnapshot["available_models"]}>),
                     ]);
                     setSnapshot({ providers: prov.providers, roles: roles.roles, available_models: models.models });
                     setSavedAt(new Date().toLocaleTimeString());
@@ -948,9 +961,9 @@ export function Settings({ open, onClose }: SettingsProps) {
                   void (async () => {
                     try {
                       const [prov, roles, models] = await Promise.all([
-                        fetch('http://127.0.0.1:7317/api/providers').then((r) => r.json() as Promise<{providers: ProviderInfo[]; roles: RoleInfo[]}>),
-                        fetch('http://127.0.0.1:7317/api/router/roles').then((r) => r.json() as Promise<{roles: RoleInfo[]}>),
-                        fetch('http://127.0.0.1:7317/api/router/models').then((r) => r.json() as Promise<{models: RuntimeSnapshot["available_models"]}>),
+                        apiFetch('/api/providers').then((r) => r.json() as Promise<{providers: ProviderInfo[]; roles: RoleInfo[]}>),
+                        apiFetch('/api/router/roles').then((r) => r.json() as Promise<{roles: RoleInfo[]}>),
+                        apiFetch('/api/router/models').then((r) => r.json() as Promise<{models: RuntimeSnapshot["available_models"]}>),
                       ]);
                       setSnapshot({ providers: prov.providers, roles: roles.roles, available_models: models.models });
                       setSavedAt(new Date().toLocaleTimeString());
