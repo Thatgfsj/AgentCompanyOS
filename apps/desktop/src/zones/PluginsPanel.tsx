@@ -7,8 +7,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@aco/ui';
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 
-const RUNTIME_URL = 'http://127.0.0.1:7317';
+const API = 'http://127.0.0.1:7317';
 
 interface PluginInfo {
   name: string;
@@ -36,8 +37,8 @@ export function PluginsPanel() {
     try {
       setLoading(true);
       setError(null);
-      const r = await fetch(`${RUNTIME_URL}/api/plugins`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const r = await tauriFetch(`${API}/api/plugins`);
+      if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
       setPlugins(data);
     } catch (e) {
@@ -66,7 +67,7 @@ export function PluginsPanel() {
         return;
       }
 
-      const r = await fetch(`${RUNTIME_URL}/api/plugins/${selectedPlugin}/invoke`, {
+      const r = await tauriFetch(`${API}/api/plugins/${selectedPlugin}/invoke`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({

@@ -140,15 +140,11 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(
-        `/api/settings/secrets/${provider.envVar}`,
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ value: apiKey.trim() }),
-        }
-      );
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const r = await apiFetch(`/api/settings/secrets/${provider.envVar}`, {
+        method: 'PUT',
+        body: { value: apiKey.trim() },
+      });
+      if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
 
       // Re-inject to os.environ
       await apiFetch('/api/settings/secrets/seed', {
@@ -183,15 +179,11 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
         `ACO_${customName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_API_KEY`;
 
       // Save API key to keychain
-      const r = await fetch(
-        `/api/settings/secrets/${envVar}`,
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ value: customApiKey.trim() }),
-        }
-      );
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const r = await apiFetch(`/api/settings/secrets/${envVar}`, {
+        method: 'PUT',
+        body: { value: customApiKey.trim() },
+      });
+      if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
 
       // Save custom provider config to localStorage
       const customProviders: CustomProvider[] = JSON.parse(
@@ -560,15 +552,11 @@ function SecretsView({ onSaved }: { onSaved: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(
-        `/api/settings/secrets/${name}`,
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ value: draftValue }),
-        }
-      );
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const r = await apiFetch(`/api/settings/secrets/${name}`, {
+        method: 'PUT',
+        body: { value: draftValue },
+      });
+      if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
       setEditing(null);
       setDraftValue('');
       onSaved();
@@ -585,11 +573,10 @@ function SecretsView({ onSaved }: { onSaved: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(
-        `/api/settings/secrets/${name}`,
-        { method: 'DELETE' }
-      );
-      if (!r.ok && r.status !== 404) throw new Error(`HTTP ${r.status}`);
+      const r = await apiFetch(`/api/settings/secrets/${name}`, {
+        method: 'DELETE',
+      });
+      if (r.status < 200 || (r.status >= 300 && r.status !== 404)) throw new Error(`HTTP ${r.status}`);
       onSaved();
       void load();
     } catch (e) {
@@ -601,11 +588,10 @@ function SecretsView({ onSaved }: { onSaved: () => void }) {
 
   const reveal = async (name: string) => {
     try {
-      const r = await fetch(
-        `/api/settings/secrets/${name}/reveal`,
-        { method: 'POST' }
-      );
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const r = await apiFetch(`/api/settings/secrets/${name}/reveal`, {
+        method: 'POST',
+      });
+      if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
       const data = (await r.json()) as { value: string };
       setRevealed((prev) => ({ ...prev, [name]: data.value }));
     } catch (e) {
@@ -617,10 +603,9 @@ function SecretsView({ onSaved }: { onSaved: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await fetch(
-        '/api/settings/secrets/seed',
-        { method: 'POST' }
-      );
+      await apiFetch('/api/settings/secrets/seed', {
+        method: 'POST',
+      });
       onSaved();
     } catch (e) {
       setError(`reseed failed: ${e}`);
