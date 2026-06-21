@@ -14,9 +14,12 @@ mutate it. Restarting the runtime clears everything.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from dataclasses import dataclass, field
 from typing import Any
+
+from loguru import logger
 
 from aco_runtime_lib.providers.anthropic import AnthropicProvider
 from aco_runtime_lib.providers.base import Provider
@@ -74,48 +77,36 @@ def _is_key_present(env_var: str, is_local: bool) -> bool:
     return val.strip() != ""
 
 
-def _build_provider(preset: ProviderPreset) -> Provider:
-    """Construct a live `Provider` for a preset.
+def _build_provider(
+    provider_id: str,
+    kind: str,
+    base_url: str,
+    api_key_env: str,
+    is_local: bool = False,
+) -> Provider:
+    """Construct a live `Provider` for either a preset or a custom entry.
 
     The API key is read from the env var on each construction;
     we don't cache it.
     """
-    api_key = os.environ.get(preset.api_key_env, "")
-    if not _is_key_present(preset.api_key_env, preset.is_local):
+    api_key = os.environ.get(api_key_env, "")
+    if not _is_key_present(api_key_env, is_local):
         raise RuntimeError(
-            f"env var {preset.api_key_env!r} is not set; "
-            f"provider {preset.id!r} cannot be initialized"
+            f"env var {api_key_env!r} is not set; "
+            f"provider {provider_id!r} cannot be initialized"
         )
-    if preset.kind == "anthropic":
-        return AnthropicProvider(
-            api_key=api_key,
-            base_url=preset.base_url,
-        )
-    if preset.kind == "openai":
-        return OpenAIProvider(
-            api_key=api_key,
-            base_url=preset.base_url,
-        )
-    if preset.kind == "google":
-        # Lazy import — Google may not be implemented in all builds.
+    if kind == "anthropic":
+        return AnthropicProvider(api_key=api_key, base_url=base_url)
+    if kind == "openai":
+        return OpenAIProvider(api_key=api_key, base_url=base_url)
+    if kind == "google":
         from aco_runtime_lib.providers.google import GoogleProvider
-
-        return GoogleProvider(api_key=api_key, base_url=preset.base_url)
-    if preset.kind == "openai_compat":
-        # MiniMax, Kimi, OpenAI-compat family, etc. We dispatch by id.
-        if preset.id == "minimax":
-            return MiniMaxProvider(
-                api_key=api_key,
-                base_url=preset.base_url,
-            )
-        # Default: re-use MiniMaxProvider as a generic OpenAI-compat
-        # client (the implementation works for any OpenAI-compatible
-        # endpoint).
-        return MiniMaxProvider(
-            api_key=api_key,
-            base_url=preset.base_url,
-        )
-    raise RuntimeError(f"unknown provider kind: {preset.kind}")
+        return GoogleProvider(api_key=api_key, base_url=base_url)
+    if kind == "openai_compat":
+        # Generic OpenAI-compat client (works for MiniMax, Kimi, DeepSeek,
+        # OpenRouter, OneAPI, allpaca, user-defined relays, …).
+        return MiniMaxProvider(api_key=api_key, base_url=base_url)
+    raise RuntimeError(f"unknown provider kind: {kind}")
 
 
 class ProviderManager:
@@ -133,6 +124,10 @@ class ProviderManager:
         self._lock = asyncio.Lock()
         # provider_id -> {enabled, base_url, api_key_env, models}
         self._config: dict[str, dict[str, Any]] = {}
+        # Custom user-defined providers (relay stations, private gateways, …)
+        # Not in PROVIDER_PRESETS; persisted to disk by `_load_custom()`
+        # on startup and written back by `save_custom()`.
+        self._custom: dict[str, dict[str, Any]] = {}
         self._role_defaults: dict[str, str] = dict(self.DEFAULT_ROLES)
         self._fallback_chains: dict[str, list[str]] = {}
         # Cache the built ModelRouter — first build is slow (~5s per
@@ -141,6 +136,7 @@ class ProviderManager:
         # force a rebuild after `apply_config()`.
         self._cached_router: ModelRouter | None = None
         self._init_defaults()
+        self._load_custom()
 
     def _init_defaults(self) -> None:
         """Seed every preset as enabled if its key is present in env."""
@@ -193,6 +189,7 @@ class ProviderManager:
 
     def list_providers(self) -> list[ProviderStatus]:
         out: list[ProviderStatus] = []
+        # Built-in presets first (so the UI shows the curated catalog).
         for preset in PROVIDER_PRESETS:
             cfg = self._config[preset.id]
             key_present = _is_key_present(preset.api_key_env, preset.is_local)
@@ -209,6 +206,23 @@ class ProviderManager:
                     is_local=preset.is_local,
                     notes=preset.notes,
                     models=[PresetModel(**m) for m in cfg["models"]],
+                )
+            )
+        # Then user-defined custom providers (relay stations, private gateways).
+        for cid, cfg in self._custom.items():
+            key_present = _is_key_present(cfg["api_key_env"], False)
+            out.append(
+                ProviderStatus(
+                    id=cid,
+                    display_name=str(cfg["display_name"]),
+                    kind=str(cfg["kind"]),
+                    base_url=str(cfg["base_url"]),
+                    api_key_env=str(cfg["api_key_env"]),
+                    enabled=bool(cfg.get("enabled", True)) and key_present,
+                    key_present=key_present,
+                    is_local=False,
+                    notes="Custom relay / private gateway",
+                    models=[PresetModel(**m) for m in cfg.get("models", [])],
                 )
             )
         return out
@@ -260,6 +274,88 @@ class ProviderManager:
                 raise ValueError(f"fallback chain entries must be 'provider:model', got {ref!r}")
         self._fallback_chains[role] = list(chain)
 
+    # ── Custom (user-defined) providers ──────────────────────────
+    #
+    # Relay stations, private gateways, etc. — anything outside the
+    # curated `PROVIDER_PRESETS` catalog. Persisted to
+    # `~/.aco/custom_providers.json` so the user doesn't have to re-add
+    # them after every restart.
+
+    _CUSTOM_PATH = os.path.join(
+        os.path.expanduser("~"), ".aco", "custom_providers.json"
+    )
+
+    def _load_custom(self) -> None:
+        if not os.path.isfile(self._CUSTOM_PATH):
+            return
+        try:
+            with open(self._CUSTOM_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for cid, cfg in (data or {}).items():
+                self._custom[cid] = cfg
+            logger.info("loaded {} custom provider(s) from {}", len(self._custom), self._CUSTOM_PATH)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("failed to load custom providers: {}", e)
+
+    def save_custom(self) -> None:
+        os.makedirs(os.path.dirname(self._CUSTOM_PATH), exist_ok=True)
+        with open(self._CUSTOM_PATH, "w", encoding="utf-8") as f:
+            json.dump(self._custom, f, ensure_ascii=False, indent=2)
+
+    def register_custom(
+        self,
+        provider_id: str,
+        display_name: str,
+        kind: str,
+        base_url: str,
+        api_key_env: str,
+        models: list[dict] | None = None,
+    ) -> None:
+        if provider_id in {p.id for p in PROVIDER_PRESETS}:
+            raise ValueError(
+                f"id {provider_id!r} clashes with a built-in preset; pick another"
+            )
+        if kind not in ("anthropic", "openai", "openai_compat"):
+            raise ValueError(
+                f"kind must be anthropic | openai | openai_compat, got {kind!r}"
+            )
+        if not base_url.startswith(("http://", "https://")):
+            raise ValueError(f"base_url must start with http:// or https://, got {base_url!r}")
+        if not api_key_env or not api_key_env.replace("_", "").isalnum():
+            raise ValueError(f"api_key_env must be alphanumeric+underscores, got {api_key_env!r}")
+        # Normalize models to PresetModel-shaped dicts.
+        norm_models: list[dict] = []
+        for m in models or []:
+            norm_models.append({
+                "id": m["id"],
+                "display_name": m.get("display_name") or m["id"],
+                "context_window": int(m.get("context_window", 8192)),
+                "max_output_tokens": int(m.get("max_output_tokens", 4096)),
+                "input_cost_mtok": float(m.get("input_cost_mtok", 0.0)),
+                "output_cost_mtok": float(m.get("output_cost_mtok", 0.0)),
+                "capabilities": tuple(m.get("capabilities", ("chat", "stream", "json_mode"))),
+            })
+        self._custom[provider_id] = {
+            "display_name": display_name,
+            "kind": kind,
+            "base_url": base_url,
+            "api_key_env": api_key_env,
+            "models": norm_models,
+            "enabled": True,
+        }
+        self.invalidate_router()
+        self.save_custom()
+
+    def remove_custom(self, provider_id: str) -> None:
+        if provider_id not in self._custom:
+            raise KeyError(f"unknown custom provider: {provider_id!r}")
+        del self._custom[provider_id]
+        self.invalidate_router()
+        self.save_custom()
+
+    def is_custom(self, provider_id: str) -> bool:
+        return provider_id in self._custom
+
     # ── Build a router from the current state ──────────────────
 
     def build_router(self) -> ModelRouter:
@@ -282,11 +378,21 @@ class ProviderManager:
         for status in self.list_providers():
             if not status.enabled:
                 continue
-            preset = get_preset(status.id)
-            if preset is None:
-                continue
             try:
-                providers[status.id] = _build_provider(preset)
+                if status.id in self._custom:
+                    cfg = self._custom[status.id]
+                    providers[status.id] = _build_provider(
+                        status.id, cfg["kind"], cfg["base_url"],
+                        cfg["api_key_env"], is_local=False,
+                    )
+                else:
+                    preset = get_preset(status.id)
+                    if preset is None:
+                        continue
+                    providers[status.id] = _build_provider(
+                        preset.id, preset.kind, preset.base_url,
+                        preset.api_key_env, is_local=preset.is_local,
+                    )
             except RuntimeError:
                 # Key missing at construction time — skip.
                 continue

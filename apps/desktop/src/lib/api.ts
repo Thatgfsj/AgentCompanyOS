@@ -115,6 +115,39 @@ export async function invokePlugin(name: string, args: Record<string, unknown>):
   return invoke('invoke_plugin', { name, args });
 }
 
+export interface ProviderModel {
+  id: string;
+  display_name: string;
+}
+
+export interface FetchedModelsResult {
+  ok: boolean;
+  models: ProviderModel[];
+  count: number;
+  error?: string;
+}
+
+export async function fetchProviderModels(id: string): Promise<FetchedModelsResult> {
+  return invoke<FetchedModelsResult>('fetch_provider_models', { id });
+}
+
+export interface CustomProviderSpec {
+  id: string;
+  display_name: string;
+  kind: 'anthropic' | 'openai' | 'openai_compat';
+  base_url: string;
+  api_key_env: string;
+  models: ProviderModel[];
+}
+
+export async function addCustomProvider(spec: CustomProviderSpec): Promise<ProviderInfo> {
+  return invoke<ProviderInfo>('add_custom_provider', { ...spec });
+}
+
+export async function removeCustomProvider(id: string): Promise<{ ok: boolean }> {
+  return invoke<{ ok: boolean }>('remove_custom_provider', { id });
+}
+
 // ── Workflow ─────────────────────────────────────────────────────
 
 export async function startWorkflow(text: string): Promise<{ id: string }> {

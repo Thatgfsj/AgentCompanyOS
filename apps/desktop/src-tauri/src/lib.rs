@@ -367,6 +367,48 @@ async fn list_plugins() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
+async fn fetch_provider_models(id: String) -> Result<serde_json::Value, String> {
+    // Pulls the live model catalog from the provider's own /models
+    // (or equivalent) endpoint. The Python side dispatches per
+    // provider id (Ollama uses /api/tags, Gemini uses ?key=, etc.)
+    // so the Rust shell just forwards.
+    pipe_request("GET", &format!("/api/providers/{}/models", id), None).await
+}
+
+#[tauri::command]
+async fn add_custom_provider(
+    id: String,
+    display_name: String,
+    kind: String,
+    base_url: String,
+    api_key_env: String,
+    models: Vec<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    // Register a user-defined provider (relay station / private
+    // gateway). Body shape matches the Python `register_custom`
+    // signature; the persistence happens in Python
+    // (~/.aco/custom_providers.json).
+    pipe_request(
+        "POST",
+        "/api/providers/custom",
+        Some(serde_json::json!({
+            "id": id,
+            "display_name": display_name,
+            "kind": kind,
+            "base_url": base_url,
+            "api_key_env": api_key_env,
+            "models": models,
+        })),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn remove_custom_provider(id: String) -> Result<serde_json::Value, String> {
+    pipe_request("DELETE", &format!("/api/providers/custom/{}", id), None).await
+}
+
+#[tauri::command]
 async fn invoke_plugin(
     name: String,
     args: serde_json::Value,
@@ -382,9 +424,13 @@ async fn invoke_plugin(
 #[tauri::command]
 async fn start_workflow_cmd(
     state: tauri::State<'_, AppState>,
-    req: NewWorkflowRequest,
+    text: String,
+    project_id: Option<String>,
 ) -> Result<NewWorkflowResponse, String> {
-    start_workflow(state, req).await
+    // Flatten at the Tauri boundary so the webview can pass each field
+    // as a top-level arg (`invoke('start_workflow_cmd', { text, project_id })`).
+    // The alternative `{ req: { text, ... } }` confused Tauri's IPC deserializer.
+    start_workflow(state, NewWorkflowRequest { text, project_id }).await
 }
 
 #[tauri::command]
@@ -462,7 +508,8 @@ pub fn run() {
             list_secrets, save_secret, delete_secret, reveal_secret, seed_secrets,
             list_providers, toggle_provider,
             list_router_roles, list_router_models, update_router_roles,
-            list_plugins, invoke_plugin,
+            list_plugins, invoke_plugin, fetch_provider_models,
+            add_custom_provider, remove_custom_provider,
             start_workflow_cmd, get_workflow, cancel_workflow,
         ])
         .run(tauri::generate_context!())
