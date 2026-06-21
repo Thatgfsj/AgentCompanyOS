@@ -16,6 +16,8 @@ desktop.ini
 .env.*.local
 *.pem
 *.key
+*.cer
+*.pfx
 secrets/
 
 # ─── Rust ────────────────────────────────────────────
@@ -74,6 +76,11 @@ storage/sessions/
 .agent-memory/
 .aco/
 .acod/
+
+# ─── Dev / Test Scripts (one-off, not for repo) ──────
+test_install.bat
+test_*.bat
+scripts/local/
 
 # ─── Build Outputs ───────────────────────────────────
 dist/
