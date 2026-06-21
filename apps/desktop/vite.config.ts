@@ -24,21 +24,24 @@ for (const [name, content] of Object.entries(STUB_FILES)) {
   writeFileSync(resolve(STUB_DIR, name), content, 'utf-8');
 }
 
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  clearScreen: false,
-  resolve: {
-    alias: {
-      // Stub out Tauri APIs in browser dev mode. The real
-      // `@tauri-apps/api/*` packages are still required at runtime
-      // (Tauri webview); they're resolved from the app's node_modules
-      // when the bundler runs inside Tauri.
-      '@tauri-apps/api/core': fileURLToPath(new URL('./.tauri-stubs/core.js', import.meta.url)),
-      '@tauri-apps/api/event': fileURLToPath(new URL('./.tauri-stubs/event.js', import.meta.url)),
-      '@tauri-apps/api/shell': fileURLToPath(new URL('./.tauri-stubs/shell.js', import.meta.url)),
-      '@tauri-apps/api/path': fileURLToPath(new URL('./.tauri-stubs/path.js', import.meta.url)),
+export default defineConfig(({ command }) => {
+  const isDev = command === 'serve';
+
+  return {
+    plugins: [react(), tailwindcss()],
+    clearScreen: false,
+    resolve: {
+      // Only stub Tauri APIs in dev mode (browser dev server).
+      // In production builds, use real @tauri-apps/api so invoke() works.
+      alias: isDev
+        ? {
+            '@tauri-apps/api/core': fileURLToPath(new URL('./.tauri-stubs/core.js', import.meta.url)),
+            '@tauri-apps/api/event': fileURLToPath(new URL('./.tauri-stubs/event.js', import.meta.url)),
+            '@tauri-apps/api/shell': fileURLToPath(new URL('./.tauri-stubs/shell.js', import.meta.url)),
+            '@tauri-apps/api/path': fileURLToPath(new URL('./.tauri-stubs/path.js', import.meta.url)),
+          }
+        : {},
     },
-  },
   server: {
     port: 1420,
     strictPort: true,
@@ -53,10 +56,11 @@ export default defineConfig({
       ignored: ['**/src-tauri/**', '**/.tauri-stubs/**'],
     },
   },
-  envPrefix: ['VITE_', 'TAURI_'],
-  build: {
-    target: 'es2022',
-    minify: 'esbuild',
-    sourcemap: true,
-  },
+    envPrefix: ['VITE_', 'TAURI_'],
+    build: {
+      target: 'es2022',
+      minify: 'esbuild',
+      sourcemap: true,
+    },
+  };
 });
