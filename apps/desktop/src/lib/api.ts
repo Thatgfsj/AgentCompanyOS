@@ -113,7 +113,7 @@ export async function invokePlugin(name: string, args: Record<string, unknown>):
 // ── Workflow ─────────────────────────────────────────────────────
 
 export async function startWorkflow(text: string): Promise<{ id: string }> {
-  return invoke('start_workflow_cmd', { req: { text } });
+  return invoke('start_workflow_cmd', { text });
 }
 
 export async function getWorkflowPlan(id: string): Promise<Record<string, unknown>> {

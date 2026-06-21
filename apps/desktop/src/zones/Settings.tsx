@@ -36,8 +36,11 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
     setBusy(true);
     setError(null);
     try {
+      console.log('[QuickAddAI] saving:', provider.envVar);
       await saveSecret(provider.envVar, apiKey.trim());
+      console.log('[QuickAddAI] saved, seeding...');
       await seedSecrets();
+      console.log('[QuickAddAI] seeded');
       setSuccess(true);
       setApiKey('');
       onSaved();
@@ -47,6 +50,7 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
         setSelected(null);
       }, 1500);
     } catch (e) {
+      console.error('[QuickAddAI] save failed:', e);
       setError(e instanceof Error ? e.message : '保存失败');
     } finally {
       setBusy(false);
@@ -313,10 +317,13 @@ export function Settings({ open, onClose }: SettingsProps) {
         listRouterRoles(),
         listRouterModels(),
       ]);
-      setSnapshot({ providers: prov.providers, roles: roles.roles, available_models: models.models });
-      setSavedAt(new Date().toLocaleTimeString());
-    } catch {
-      /* ignore */
+      console.log('[Settings] refresh:', { prov, roles, models });
+      if (prov && roles && models) {
+        setSnapshot({ providers: prov.providers, roles: roles.roles, available_models: models.models });
+        setSavedAt(new Date().toLocaleTimeString());
+      }
+    } catch (e) {
+      console.error('[Settings] refresh failed:', e);
     }
   };
 
