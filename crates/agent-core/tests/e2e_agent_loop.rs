@@ -406,6 +406,7 @@ async fn read_only_capability_blocks_write_tool() {
         workspace: ws,
         approved: true,
         capabilities: Capabilities::read_only(),
+        cancel: None,
     };
 
     let out = reg

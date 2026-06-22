@@ -133,12 +133,25 @@ impl Tool for BashTool {
         cmd.current_dir(&ctx.workspace.root);
         cmd.kill_on_drop(true);
 
-        let output = tokio::time::timeout(timeout, cmd.output())
-            .await
-            .map_err(|_| {
-                ToolError::Other(format!("timed out after {}s", timeout.as_secs()))
-            })?
-            .map_err(ToolError::Io)?;
+        // Race the subprocess against (timeout, optional cancel).
+        // Whichever fires first wins; `cmd.output()` is dropped on
+        // cancel, which thanks to `kill_on_drop(true)` sends SIGKILL
+        // to the child.
+        let output_fut = cmd.output();
+        tokio::pin!(output_fut);
+        let output = if let Some(token) = &ctx.cancel {
+            tokio::select! {
+                biased;
+                _ = token.cancelled() => {
+                    return Ok(ToolOutput::err("cancelled by user"));
+                }
+                res = tokio::time::timeout(timeout, &mut output_fut) => res,
+            }
+        } else {
+            tokio::time::timeout(timeout, &mut output_fut).await
+        }
+        .map_err(|_| ToolError::Other(format!("timed out after {}s", timeout.as_secs())))?
+        ?;
 
         let mut buf = String::with_capacity(output.stdout.len() + output.stderr.len() + 64);
         if !output.stdout.is_empty() {
@@ -260,6 +273,7 @@ mod cap_tests {
             workspace: Workspace::new(std::env::temp_dir(), "tmp"),
             approved: false,
             capabilities: caps,
+            ..Default::default()
         }
     }
 
@@ -318,4 +332,44 @@ mod cap_tests {
         assert!(!super::looks_like_network("echo hello"));
         assert!(!super::looks_like_network("node server.js"));
     }
+
+    #[tokio::test]
+    async fn cancel_kills_long_running_bash() {
+        use std::time::Duration;
+        use tokio_util::sync::CancellationToken;
+
+        let token = CancellationToken::new();
+        let mut ctx = ToolContext {
+            workspace: crate::workspace::Workspace::new(std::env::temp_dir(), "cancel-test"),
+            approved: true,
+            capabilities: crate::tool::Capabilities::default(),
+            cancel: Some(token.clone()),
+        };
+        ctx.capabilities.network = true;
+
+        #[cfg(target_os = "windows")]
+        let cmd = "ping -n 30 127.0.0.1 > nul";
+        #[cfg(not(target_os = "windows"))]
+        let cmd = "sleep 60";
+
+        let handle = tokio::spawn(async move {
+            BashTool
+                .execute(serde_json::json!({"command": cmd}), &ctx)
+                .await
+                .unwrap()
+        });
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        token.cancel();
+        let out = tokio::time::timeout(Duration::from_secs(5), handle)
+            .await
+            .expect("bash did not honour cancel within 5s")
+            .unwrap();
+        assert!(out.is_error, "cancelled run should be is_error");
+        assert!(
+            out.content.contains("cancelled by user"),
+            "got: {}",
+            out.content
+        );
+    }
 }
+// file end

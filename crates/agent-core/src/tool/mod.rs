@@ -88,6 +88,12 @@ pub struct ToolContext {
     /// Construct non-default contexts with [`Capabilities::read_only`],
     /// [`Capabilities::network_off`], etc.
     pub capabilities: Capabilities,
+    /// Cancellation token. Tools should poll this between heavy
+    /// steps; the `bash` tool already races its subprocess against
+    /// `cancel.cancelled()` via the provider's SSE stream. The
+    /// token here lets tools that take longer than a single
+    /// subprocess observe user-cancellation.
+    pub cancel: Option<tokio_util::sync::CancellationToken>,
 }
 
 impl Default for ToolContext {
@@ -96,6 +102,7 @@ impl Default for ToolContext {
             workspace: Workspace::default(),
             approved: true,
             capabilities: Capabilities::default(),
+            cancel: None,
         }
     }
 }
@@ -109,6 +116,7 @@ impl ToolContext {
             workspace,
             approved: true,
             capabilities: Capabilities::default(),
+            cancel: None,
         }
     }
 }

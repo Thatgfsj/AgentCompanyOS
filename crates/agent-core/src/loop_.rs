@@ -152,6 +152,7 @@ async fn drive_loop(
         workspace: workspace.clone(),
         approved: true,
         capabilities: crate::tool::Capabilities::default(),
+        cancel: Some(cancel.clone()),
     };
 
     for iteration in 0..cfg.max_iterations {
