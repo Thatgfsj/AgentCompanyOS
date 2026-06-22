@@ -239,6 +239,23 @@ async fn list_secrets() -> Result<serde_json::Value, String> {
     pipe_request("GET", "/api/settings/secrets", None).await
 }
 
+/// Run a single agent task envelope end-to-end.
+///
+/// Bridges the React `ChatZone` to the embedded pipe-server's
+/// `/api/run_task` handler. The handler drives the in-process
+/// agent-core loop, which streams events back over
+/// `\\.\pipe\aco_runtime_events` and surfaces them through the
+/// normal `wf:event` Tauri channel.
+///
+/// Body shape matches `run_task` in `crates/pipe-server/src/handlers.rs`:
+///   { task: string, role?: string, provider_kind?: string,
+///     base_url?: string, model?: string, api_key?: string,
+///     api_key_env?: string }
+#[tauri::command]
+async fn run_agent_task(body: serde_json::Value) -> Result<serde_json::Value, String> {
+    pipe_request("POST", "/api/run_task", Some(body)).await
+}
+
 #[tauri::command]
 async fn save_secret(name: String, value: String) -> Result<serde_json::Value, String> {
     // 1) Persist to keychain via runtime.
@@ -511,6 +528,7 @@ pub fn run() {
             list_plugins, invoke_plugin, fetch_provider_models,
             add_custom_provider, remove_custom_provider,
             start_workflow_cmd, get_workflow, cancel_workflow,
+            run_agent_task,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
