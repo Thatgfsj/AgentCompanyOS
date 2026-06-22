@@ -24,4 +24,4 @@ async-trait  = { workspace = true }
 
 [dev-dependencies]
 insta        = { workspace = true }
-tokio        = { version = "1.40", features = ["full", "test-util"] }
+tokio        = { workspace = true, features = ["test-util"] }

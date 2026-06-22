@@ -43,7 +43,6 @@ event-bus    = { path = "../event-bus" }
 
 [dev-dependencies]
 insta        = { workspace = true }
-tokio        = { version = "1.40", features = ["full", "test-util"] }
 mockall      = { workspace = true }
 tempfile     = "3"
 wiremock     = "0.6"

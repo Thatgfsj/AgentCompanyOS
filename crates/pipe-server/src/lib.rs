@@ -18,7 +18,7 @@ pub mod handlers;
 pub mod protocol;
 pub mod server;
 
-pub use dispatcher::{Dispatcher, Handler, HandlerFuture};
+pub use dispatcher::Dispatcher;
 pub use handlers::{register_all, ServerState};
 pub use protocol::{codes, RpcError, RpcParams, RpcRequest, RpcResponse, RpcResult, MAX_LINE};
 pub use server::{Server, ServerConfig};

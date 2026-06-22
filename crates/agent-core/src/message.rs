@@ -83,9 +83,6 @@ impl Message {
     }
 }
 
-/// Convenience alias for the common chat-message shape.
-pub type ChatMessage = Message;
-
 /// A request the assistant made to invoke a tool.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ToolCall {
@@ -96,17 +93,6 @@ pub struct ToolCall {
     pub name: String,
     /// JSON arguments, already validated against the tool's schema.
     pub args: serde_json::Value,
-}
-
-/// The result of executing a tool.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolResult {
-    /// The id of the originating tool call.
-    pub tool_call_id: String,
-    /// Full output (stored in history verbatim; may be large).
-    pub content: String,
-    /// Whether the tool execution succeeded.
-    pub is_error: bool,
 }
 
 #[cfg(test)]

@@ -8,8 +8,12 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: -D warnings
   PYTHONDONTWRITEBYTECODE: 1
+  # Note: no `RUSTFLAGS: -D warnings` here. Several crates use
+  # `#![warn(pedantic)]` and the `#![forbid(unsafe_code)]` lint,
+  # which our `cargo clippy -- -D warnings` invocation would
+  # over-trigger. Clippy itself is configured per-crate with
+  # the right level, so we rely on that.
 
 jobs:
   # ── Rust ──────────────────────────────────────────────────────

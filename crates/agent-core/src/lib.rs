@@ -44,9 +44,9 @@ pub mod workspace;
 
 pub use event::AgentEvent;
 pub use loop_::{Agent, AgentConfig};
-pub use message::{ChatMessage, Message, Role, ToolCall, ToolResult};
+pub use message::{Message, Role, ToolCall};
 pub use provider::{Provider, ProviderError, StreamChunk};
-pub use tool::{Tool, ToolContext, ToolError, ToolOutput, ToolRegistry};
+pub use tool::{Capabilities, Tool, ToolContext, ToolError, ToolOutput, ToolRegistry};
 pub use workspace::Workspace;
 
 /// Crate-wide error type. Wraps provider / tool / IO / serialization

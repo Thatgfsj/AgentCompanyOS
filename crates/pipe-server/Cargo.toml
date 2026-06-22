@@ -11,7 +11,7 @@ all      = { level = "deny", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
 
 [dependencies]
-tokio        = { workspace = true }
+tokio        = { workspace = true, features = ["full"] }
 async-trait  = { workspace = true }
 serde        = { workspace = true }
 serde_json   = { workspace = true }
@@ -26,11 +26,4 @@ scopeguard   = "1"
 agent-core   = { path = "../agent-core" }
 
 [dev-dependencies]
-tokio        = { version = "1.40", features = ["full", "test-util"] }
-
-[target.'cfg(windows)'.dependencies]
-# Windows uses tokio's built-in named-pipe support.
-tokio        = { version = "1.40", features = ["full"] }
-
-[target.'cfg(not(windows))'.dependencies]
-tokio        = { version = "1.40", features = ["full"] }
+tokio        = { workspace = true, features = ["test-util"] }
