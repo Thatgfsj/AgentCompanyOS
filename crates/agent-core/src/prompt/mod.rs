@@ -53,9 +53,13 @@ impl Role {
 
 /// Render the system prompt for a given role.
 ///
-/// The placeholder `{tool_list}` is replaced with a JSON array of
-/// tool schemas so the model knows what it can call.
-pub fn system_prompt(role: Role, tool_list_json: &str) -> String {
+/// The placeholder `{tool_list}` is replaced with the JSON-encoded
+/// `tool_list` so the model knows what it can call. Accepts any
+/// `Serialize` so callers can pass a `serde_json::Value`, a
+/// typed struct, or a `&str` of pre-serialised JSON.
+pub fn system_prompt<S: serde::Serialize>(role: Role, tool_list: S) -> String {
+    let tool_list_json = serde_json::to_string(&tool_list)
+        .unwrap_or_else(|_| "[]".to_string());
     let template = match role {
         Role::Chief => CHIEF,
         Role::BugHunter => BUG_HUNTER,
@@ -64,7 +68,7 @@ pub fn system_prompt(role: Role, tool_list_json: &str) -> String {
         Role::Worker => WORKER,
         Role::Reporter => REPORTER,
     };
-    template.replace("{tool_list}", tool_list_json)
+    template.replace("{tool_list}", &tool_list_json)
 }
 
 const CHIEF: &str = r#"你是 Agent Company OS 的「首席」。

@@ -137,6 +137,11 @@ async fn drive_loop(
     let mut last_failure_key: Option<String> = None;
     let mut repeat_count: usize = 0;
 
+    // Snapshot tool schemas once; they don't change between
+    // iterations. (Each `tools.schemas()` call sorts + serialises
+    // every tool's JSON schema, which adds up over many rounds.)
+    let tool_schemas_cached = tools.schemas();
+
     // Initial history: system + user task envelope.
     let mut history: Vec<Message> = vec![
         Message::system(derive_system(&agent_id, tools.schemas())),
@@ -164,7 +169,7 @@ async fn drive_loop(
 
         // ── Stream one LLM turn ───────────────────────────────
         let mut stream = provider
-            .stream_chat(&history, &tools.schemas(), cancel.clone())
+            .stream_chat(&history, &tool_schemas_cached, cancel.clone())
             .await?;
         let mut text_buf = String::new();
         let mut tool_calls: Vec<ToolCall> = Vec::new();

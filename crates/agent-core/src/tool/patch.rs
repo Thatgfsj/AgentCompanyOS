@@ -118,13 +118,15 @@ fn replace_once(haystack: &str, needle: &str, replacement: &str) -> Result<Strin
     let count = haystack.matches(needle).count();
     if count == 0 {
         return Err(ToolError::Other(format!(
-            "old_text not found ({} chars)",
+            "old_text not found in file (needle was {} chars); \
+             check whitespace, indentation, line endings, or re-read the file first",
             needle.len()
         )));
     }
     if count > 1 {
         return Err(ToolError::Other(format!(
-            "old_text matches {count} locations; must match exactly once"
+            "old_text matches {count} locations; must match exactly once. \
+             Include more surrounding context to disambiguate"
         )));
     }
     Ok(haystack.replacen(needle, replacement, 1))

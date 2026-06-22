@@ -103,3 +103,113 @@ impl Tool for GrepTool {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tool::ToolContext;
+    use crate::workspace::Workspace;
+
+    fn ctx(dir: &std::path::Path) -> ToolContext {
+        ToolContext {
+            workspace: Workspace::new(dir, "grep-test"),
+            approved: true,
+            ..Default::default()
+        }
+    }
+
+    fn write(dir: &std::path::Path, name: &str, content: &str) {
+        std::fs::write(dir.join(name), content).unwrap();
+    }
+
+    #[tokio::test]
+    async fn finds_simple_pattern() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "a.txt", "hello world\nhello rust\nbye\n");
+        write(dir.path(), "b.txt", "nope\n");
+        let out = GrepTool
+            .execute(
+                serde_json::json!({"pattern": "hello"}),
+                &ctx(dir.path()),
+            )
+            .await
+            .unwrap();
+        assert!(!out.is_error);
+        assert!(out.content.contains("a.txt:1: hello world"), "got: {}", out.content);
+        assert!(out.content.contains("a.txt:2: hello rust"));
+        assert!(!out.content.contains("b.txt"));
+        assert!(out.content.contains("2 match(es)"));
+    }
+
+    #[tokio::test]
+    async fn respects_include_glob() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "a.rs", "let x = 1;\n");
+        write(dir.path(), "b.txt", "let x = 2;\n");
+        let out = GrepTool
+            .execute(
+                serde_json::json!({"pattern": "let x", "include": "*.rs"}),
+                &ctx(dir.path()),
+            )
+            .await
+            .unwrap();
+        assert!(out.content.contains("a.rs"));
+        assert!(!out.content.contains("b.txt"));
+    }
+
+    #[tokio::test]
+    async fn no_match_returns_no_matches_message() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "a.txt", "hi\n");
+        let out = GrepTool
+            .execute(
+                serde_json::json!({"pattern": "this_does_not_appear"}),
+                &ctx(dir.path()),
+            )
+            .await
+            .unwrap();
+        assert!(!out.is_error);
+        assert!(out.content.contains("no matches"));
+    }
+
+    #[tokio::test]
+    async fn respects_max_cap() {
+        let dir = tempfile::tempdir().unwrap();
+        // 5 matching lines, max=2 → truncates
+        write(dir.path(), "a.txt", "x\nx\nx\nx\nx\n");
+        let out = GrepTool
+            .execute(
+                serde_json::json!({"pattern": "x", "max": 2}),
+                &ctx(dir.path()),
+            )
+            .await
+            .unwrap();
+        assert!(out.content.contains("truncated at 2"));
+    }
+
+    #[tokio::test]
+    async fn refuses_when_capability_off() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "a.txt", "hello\n");
+        let mut c = ctx(dir.path());
+        c.capabilities.read = false;
+        let out = GrepTool
+            .execute(serde_json::json!({"pattern": "hello"}), &c)
+            .await
+            .unwrap();
+        assert!(out.is_error);
+        assert!(out.content.contains("capability disabled"));
+    }
+
+    #[tokio::test]
+    async fn invalid_regex_is_clean_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = GrepTool
+            .execute(serde_json::json!({"pattern": "["}), &ctx(dir.path()))
+            .await
+            .expect_err("invalid regex must return Err(InvalidArgs), not Ok");
+        assert!(
+            matches!(err, crate::tool::ToolError::InvalidArgs(_)),
+            "expected InvalidArgs, got {err:?}"
+        );
+    }
+}

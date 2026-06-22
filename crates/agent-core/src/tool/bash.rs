@@ -14,6 +14,12 @@ use super::{Tool, ToolContext, ToolError, ToolOutput};
 /// Default per-invocation timeout: 60 s.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// Hard cap on the length of a single command string. Prevents
+/// the agent from constructing a multi-megabyte shell command
+/// that would balloon memory and time-to-first-byte of the
+/// subprocess creation.
+pub const MAX_COMMAND_BYTES: usize = 64 * 1024; // 64 KiB
+
 /// Patterns that always require explicit user approval. The
 /// matching is deliberately conservative — false negatives
 /// (let through something dangerous) are much worse than false
@@ -88,6 +94,14 @@ impl Tool for BashTool {
             .get("command")
             .and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::InvalidArgs("missing 'command'".into()))?;
+
+        if command.len() > MAX_COMMAND_BYTES {
+            return Ok(ToolOutput::err(format!(
+                "refused: command is {} bytes; max {} bytes",
+                command.len(),
+                MAX_COMMAND_BYTES
+            )));
+        }
 
         let timeout_secs = args
             .get("timeout_secs")

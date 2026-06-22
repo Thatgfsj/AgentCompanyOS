@@ -19,6 +19,7 @@ thiserror    = { workspace = true }
 anyhow       = { workspace = true }
 tracing      = { workspace = true }
 futures      = "0.3"
+scopeguard   = "1"
 
 # Agent core: the pipe server dispatches tasks into the in-process
 # agent runtime.

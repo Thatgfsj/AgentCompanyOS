@@ -43,8 +43,25 @@ impl Workspace {
     }
 
     /// True if `path` lives inside this workspace.
+    ///
+    /// Implementation note: plain `path.starts_with(&self.root)`
+    /// is **not** sufficient — `/tmp/proj-evil/file` would pass
+    /// for `/tmp/proj`. We require either an exact match or a
+    /// boundary separator after the root prefix.
     pub fn contains(&self, path: &Path) -> bool {
-        path.starts_with(&self.root)
+        let root = self.root.as_path();
+        let mut a = root.components();
+        let mut b = path.components();
+        loop {
+            match (a.next(), b.next()) {
+                (Some(x), Some(y)) if x == y => continue,
+                (None, _) => return true, // root is a proper prefix
+                _ => return false,
+            }
+        }
+        // Unreachable; loop either returns or `b` runs out.
+        #[allow(unreachable_code)]
+        false
     }
 }
 
@@ -60,5 +77,26 @@ mod tests {
         assert_eq!(ws.relativize(&abs), PathBuf::from("a/b.txt"));
         assert!(ws.contains(&abs));
         assert!(!ws.contains(Path::new("/etc/passwd")));
+    }
+
+    #[test]
+    fn contains_rejects_prefix_overlap_attack() {
+        // /tmp/proj-evil must NOT be considered inside /tmp/proj.
+        let ws = Workspace::new(if cfg!(windows) { r"C:\proj" } else { "/tmp/proj" }, "proj");
+        let evil = if cfg!(windows) {
+            PathBuf::from(r"C:\proj-evil\passwd")
+        } else {
+            PathBuf::from("/tmp/proj-evil/passwd")
+        };
+        assert!(!ws.contains(&evil), "{evil:?} leaked into {ws:?}");
+    }
+
+    #[test]
+    fn contains_accepts_root_itself_and_deeper() {
+        let ws = Workspace::new(if cfg!(windows) { r"C:\proj" } else { "/tmp/proj" }, "proj");
+        let root = if cfg!(windows) { PathBuf::from(r"C:\proj") } else { PathBuf::from("/tmp/proj") };
+        assert!(ws.contains(&root));
+        let deeper = if cfg!(windows) { PathBuf::from(r"C:\proj\src\main.rs") } else { PathBuf::from("/tmp/proj/src/main.rs") };
+        assert!(ws.contains(&deeper));
     }
 }

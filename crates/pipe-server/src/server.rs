@@ -246,6 +246,12 @@ async fn rpc_listener(path: String, dispatcher: Arc<Dispatcher>) -> std::io::Res
     // Stale socket from a previous run.
     let _ = std::fs::remove_file(&path);
     let listener = tokio::net::UnixListener::bind(&path)?;
+    // Drop guard: remove the socket file on graceful exit so the
+    // next start doesn't see a stale inode.
+    let path_for_cleanup = path.clone();
+    let _cleanup = scopeguard::guard((), |_| {
+        let _ = std::fs::remove_file(&path_for_cleanup);
+    });
     let mut incoming = listener.incoming();
     while let Some(stream) = incoming.next().await {
         match stream {
@@ -267,8 +273,15 @@ async fn rpc_listener(path: String, dispatcher: Arc<Dispatcher>) -> std::io::Res
 
 #[cfg(not(windows))]
 async fn events_listener(path: String, tx: broadcast::Sender<AgentEvent>) -> std::io::Result<()> {
+    // Stale socket from a previous run — remove before bind.
     let _ = std::fs::remove_file(&path);
     let listener = tokio::net::UnixListener::bind(&path)?;
+    // Drop guard: remove the socket file on graceful exit so the
+    // next start doesn't see a stale inode.
+    let path_for_cleanup = path.clone();
+    let _cleanup = scopeguard::guard((), |_| {
+        let _ = std::fs::remove_file(&path_for_cleanup);
+    });
     let mut incoming = listener.incoming();
     while let Some(stream) = incoming.next().await {
         match stream {
