@@ -18,10 +18,15 @@ final approval. The IDE is the surface; the workflow is the product.
 
 Starting in **v0.3**, ACO is **all-Rust, embedded-agent**: no Python
 sidecar, no external CLI to spawn. The agent loop, tool system, and
-LLM streaming all live inside the Tauri process. The UI borrows
-heavily from the Cursor / VSCode Chat experience: a single panel that
-shows live file edits, terminal output, and timeline events as the
-agent works.
+LLM streaming all live inside the Tauri process. The UI gets a
+**Chat Zone** docked next to the existing Settings — progressive,
+not a full IDE rewrite.
+
+**LLM provider strategy:** One wire format (OpenAI Chat Completions +
+SSE). Anthropic is reached either through OpenAI-compat proxies
+(AWS Bedrock, LiteLLM, etc.) or via a thin adapter that translates
+Anthropic Messages API ↔ OpenAI on the fly. No second first-class
+provider client.
 
 ---
 
@@ -71,30 +76,28 @@ with 5 zones.
 All major providers wired, custom relay support, cost tracking,
 plugin UI panels.
 
-### v0.3 — Embedded Agent (Rust) + IDE UI ⏳ **current**
+### v0.3 — Embedded Agent (Rust) + Chat Zone ⏳ **current**
 
-> **Title:** Kill the sidecar. Live like an IDE.
+> **Title:** Kill the sidecar. Add a chat box.
 
 **Done criteria:**
 
-- [ ] **`crates/agent-core`** — in-process agent loop, tool trait,
-  context window manager, SSE streaming
-- [ ] **Provider trait (Rust)** — OpenAI, Anthropic, Gemini all
-  implemented natively with `reqwest` + SSE parsing
-- [ ] **Tool system** — `read` / `write` / `patch` (unified-diff apply)
-  / `bash` (tokio::process) / `grep` / `glob` all in Rust
-- [ ] **Patch algorithm** — bidirectional fuzzy match (not a CLI
-  dependency); `.bak` backup before any write
+- [x] **`crates/agent-core`** — in-process agent loop, tool trait,
+  context window manager, SSE streaming *(shipped W1)*
+- [ ] **Provider: OpenAI-compat only** — Anthropic supported through
+  an OpenAI-compat adapter layer (vendor proxies); no separate
+  Anthropic-native client
+- [x] **Tool system** — `read` / `write` / `patch` / `bash` / `grep`
+  all in Rust *(shipped W1)*
 - [ ] **`crates/pipe-server`** — Rust named-pipe server replaces the
-  Python FastAPI runtime. JSON-RPC protocol over
-  `\\.\pipe\aco_runtime` + `\\.\pipe\aco_runtime_events`
-- [ ] **Python runtime deleted** — `apps/runtime/` and `runtime/`
-  removed; `apps/desktop` builds and runs without Python on PATH
-- [ ] **IDE-style single-page UI** — 4 zones:
-  - left: live file tree (auto-refreshes after tool writes)
-  - center: Monaco editor with diff view for active file
-  - right: Timeline (agent actions streaming)
-  - bottom: chat input + xterm.js console
+  Python FastAPI runtime
+- [ ] **Python runtime deleted** — `apps/runtime/`, `runtime/`, and
+  `crates/claude-adapter/` removed; desktop builds and runs
+  without Python on PATH
+- [ ] **Chat Zone (progressive)** — new chat zone docked next to
+  Settings. NOT a full IDE rewrite — same 5-zone layout, just
+  with a chat panel for sending tasks to the agent. Streaming
+  text deltas + tool timeline appear inside the chat zone.
 - [ ] **Streaming** — text deltas, tool started/finished, file diffs
   all arrive live; user sees activity in < 200 ms after prompt
 - [ ] **Roles relabeled to 中文** — 首席 / 缺陷猎手 / 工匠 / 质检师 / 军师

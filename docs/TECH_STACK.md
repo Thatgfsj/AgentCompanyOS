@@ -193,18 +193,20 @@ writing our own 200-line loop.
 
 | Provider | Used for | Rust impl |
 |----------|----------|-----------|
-| **OpenAI** | GPT-4o, GPT-4-Turbo, o1, o3 | `reqwest` + SSE |
-| **Anthropic** | Claude 3.5/3.7/4 Sonnet, Opus, Haiku | `reqwest` + SSE |
-| **Google Gemini** | Gemini 2.0/2.5 Pro/Flash | `reqwest` + SSE |
-| **Moonshot** | Kimi K2 | OpenAI-compat (covered by `openai.rs`) |
-| **DeepSeek** | DeepSeek Chat, Reasoner | OpenAI-compat |
-| **Ollama** | Local models | OpenAI-compat |
-| **LM Studio** | Local models | OpenAI-compat |
-| **Custom relay** | User-defined endpoints | OpenAI-compat |
-| **OpenRouter** | Aggregator | OpenAI-compat |
+| **OpenAI** | GPT-4o, GPT-4-Turbo, o1, o3 | `OpenAiProvider::openai()` |
+| **Anthropic** | Claude 3.5/3.7/4 Sonnet, Opus, Haiku | `AnthropicAdapter` translates to OpenAI-compat on the fly, OR routed through an OpenAI-compat proxy (Bedrock / LiteLLM) |
+| **Moonshot** | Kimi K2 | `OpenAiProvider::compat()` |
+| **Google Gemini** | Gemini 2.0/2.5 Pro/Flash | `OpenAiProvider::compat()` against Google's OpenAI-compat endpoint |
+| **DeepSeek** | DeepSeek Chat, Reasoner | `OpenAiProvider::compat()` |
+| **Ollama** | Local models | `OpenAiProvider::compat()` |
+| **LM Studio** | Local models | `OpenAiProvider::compat()` |
+| **Custom relay** | User-defined endpoints | `OpenAiProvider::compat()` |
+| **OpenRouter** | Aggregator | `OpenAiProvider::compat()` |
 
-All providers go through the `Provider` trait. A new provider is
-**one file** in `crates/agent-core/src/providers/`.
+**One wire format** (OpenAI Chat Completions + SSE). All providers
+speak it; Anthropic is bridged in by an adapter if going direct.
+Adding a new provider is **zero new code** — the user pastes an
+OpenAI-compat base URL + key, and `OpenAiProvider::compat()` works.
 
 **v0.3 removes** from the built-in preset catalog: MiniMax, DeepSeek
 (users can still add them as custom relays).

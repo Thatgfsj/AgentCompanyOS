@@ -136,10 +136,13 @@ crates/agent-core/src/
 │   └── glob.rs         glob pattern matcher
 ├── providers/
 │   ├── mod.rs          Provider trait: stream_chat(messages) -> Stream<Chunk>
-│   ├── openai.rs       OpenAI-compat (also covers DeepSeek, Moonshot, custom)
-│   ├── anthropic.rs    Anthropic messages API + SSE
-│   ├── google.rs       Gemini
-│   └── custom.rs       user-defined relay (from provider-presets)
+│   ├── openai.rs       OpenAI Chat Completions + SSE. The only first-class
+│   │                   client. Covers OpenAI itself plus ANY OpenAI-compat
+│   │                   endpoint (Anthropic via Bedrock/LiteLLM, Gemini,
+│   │                   DeepSeek, Moonshot, Ollama, LM Studio, custom relay).
+│   └── anthropic_adapter.rs   Optional adapter: translates Anthropic Messages
+│                              API ↔ OpenAI Chat Completions for users who
+│                              need direct Anthropic support without a proxy.
 ├── prompt/
 │   ├── system.rs       system prompts per role (首席 / 缺陷猎手 / 工匠 / ...)
 │   └── template.rs     placeholder substitution + context injection
@@ -222,26 +225,35 @@ The `patch` tool accepts a unified diff:
 
 ---
 
-## 5. Frontend Layout
+## 5. Frontend Layout (v0.3 progressive)
 
 ```
 apps/desktop/src/
-├── zones/              (legacy zone layout, kept for Settings & Plugins)
-├── pages/              (v0.3 — new IDE-style single page)
-│   ├── WorkspacePage.tsx       ⭐ the new IDE shell
-│   ├── FileTreePanel.tsx
-│   ├── MonacoDiffPanel.tsx
-│   ├── TimelinePanel.tsx
-│   ├── ConsolePanel.tsx
-│   └── ChatDock.tsx
+├── zones/                  (legacy zone layout, mostly preserved)
+│   ├── Settings.tsx
+│   ├── LeftRoster.tsx
+│   ├── CenterPanel.tsx
+│   ├── RightPanel.tsx
+│   ├── BottomConsole.tsx
+│   ├── TopBar.tsx
+│   └── CommandDock.tsx
+├── zones/ChatZone.tsx      ⭐ v0.3 — new chat zone (docked next to Settings)
+│                              progressive: reuses existing zone chrome,
+│                              no IDE rewrite. Streams text deltas +
+│                              tool events from useAgentStream /
+│                              useToolEvents hooks.
 ├── hooks/
 │   ├── useEventStream.ts        (already exists)
 │   ├── useAgentStream.ts        ⭐ text delta subscription
-│   ├── useToolEvents.ts         ⭐ tool started/finished subscription
-│   └── useFileTree.ts           ⭐ live file tree (notify-rs backend)
+│   └── useToolEvents.ts         ⭐ tool started/finished subscription
 ├── stores/             (Zustand)
 └── lib/api.ts
 ```
+
+**v0.3 is a progressive change.** The 5-zone layout stays; a new
+`ChatZone` slot is added in the existing dock (next to Settings).
+A full IDE rewrite (Monaco diff / live file tree / dedicated
+timeline column) is **deferred to v0.4**.
 
 ---
 
