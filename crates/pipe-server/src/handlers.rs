@@ -100,11 +100,19 @@ async fn run_task(body: Value, state: Arc<ServerState>) -> Result<(u16, Value), 
         .and_then(|v| v.as_str())
         .ok_or_else(|| "missing 'model'".to_string())?
         .to_string();
-    let api_key = body
-        .get("api_key")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
+    // Two ways to pass the key: explicit `api_key` (preferred for
+    // an embedded sidecar) or `api_key_env` (read from process env
+    // — useful when the Tauri shell wants to keep secrets out of
+    // the JSON payload).
+    let api_key = match body.get("api_key").and_then(|v| v.as_str()) {
+        Some(s) if !s.is_empty() => s.to_string(),
+        _ => match body.get("api_key_env").and_then(|v| v.as_str()) {
+            Some(var) => std::env::var(var).map_err(|_| {
+                format!("api_key_env '{var}' not set in process environment")
+            })?,
+            None => String::new(),
+        },
+    };
     let role = body
         .get("role")
         .and_then(|v| v.as_str())
