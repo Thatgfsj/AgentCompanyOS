@@ -52,6 +52,9 @@ impl Tool for PatchTool {
         args: serde_json::Value,
         ctx: &ToolContext,
     ) -> Result<ToolOutput, ToolError> {
+        if !ctx.capabilities.write {
+            return Ok(ToolOutput::err("refused: write capability disabled (patch)"));
+        }
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -162,6 +165,7 @@ mod tests {
         let ctx = ToolContext {
             workspace: Workspace::new(dir.path(), "t"),
             approved: false,
+            ..Default::default()
         };
         let out = PatchTool
             .execute(
@@ -185,6 +189,7 @@ mod tests {
         let ctx = ToolContext {
             workspace: Workspace::new(dir.path(), "t"),
             approved: false,
+            ..Default::default()
         };
         let err = PatchTool
             .execute(

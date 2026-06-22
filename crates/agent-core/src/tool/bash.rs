@@ -80,6 +80,10 @@ impl Tool for BashTool {
         args: serde_json::Value,
         ctx: &ToolContext,
     ) -> Result<ToolOutput, ToolError> {
+        if !ctx.capabilities.bash {
+            return Ok(ToolOutput::err("refused: bash capability disabled"));
+        }
+
         let command = args
             .get("command")
             .and_then(|v| v.as_str())
@@ -90,6 +94,13 @@ impl Tool for BashTool {
             .and_then(|v| v.as_u64())
             .unwrap_or(DEFAULT_TIMEOUT.as_secs());
         let timeout = Duration::from_secs(timeout_secs.min(600));
+
+        // Capability: outbound network.
+        if !ctx.capabilities.network && looks_like_network(command) {
+            return Ok(ToolOutput::err(
+                "refused: command appears to use the network, but network capability is off",
+            ));
+        }
 
         // Safety check: dangerous patterns.
         let lower = command.to_lowercase();
@@ -153,6 +164,25 @@ fn build_shell_command(command: &str) -> Command {
     c
 }
 
+/// Crude heuristic: does this command look like it touches the
+/// network? Used to gate the `network` capability. Intentionally
+/// conservative — false positives (refused when allowed) are much
+/// cheaper than false negatives (allowed when not).
+fn looks_like_network(cmd: &str) -> bool {
+    let lower = cmd.to_lowercase();
+    // Common network-using binaries and a couple of protocols.
+    const MARKERS: &[&str] = &[
+        "curl", "wget", "httpie", "http ", "https://", "http://",
+        "ftp ", "sftp", "scp", "rsync ", "ssh ",
+        "npm install", "pnpm install", "yarn add", "pip install",
+        "git clone", "git fetch", "git pull", "git push",
+        "nslookup", "ping ", "tracert", "traceroute",
+        "telnet ", "nc ", "netcat",
+        "powershell -command",  // over-eager but safe
+    ];
+    MARKERS.iter().any(|m| lower.contains(m))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -162,6 +192,7 @@ mod tests {
         ToolContext {
             workspace: Workspace::new(std::env::temp_dir(), "tmp"),
             approved: false,
+            ..Default::default()
         }
     }
 
@@ -202,5 +233,75 @@ mod tests {
             .await
             .unwrap();
         assert!(!out.is_error);
+    }
+}
+#[cfg(test)]
+mod cap_tests {
+    use super::*;
+    use crate::tool::{Capabilities, ToolContext};
+    use crate::workspace::Workspace;
+
+    fn ctx_with(caps: Capabilities) -> ToolContext {
+        ToolContext {
+            workspace: Workspace::new(std::env::temp_dir(), "tmp"),
+            approved: false,
+            capabilities: caps,
+        }
+    }
+
+    #[tokio::test]
+    async fn bash_capability_off_is_refused() {
+        let out = BashTool
+            .execute(
+                serde_json::json!({"command": "echo hi"}),
+                &ctx_with(Capabilities::no_modify()),
+            )
+            .await
+            .unwrap();
+        assert!(out.is_error);
+        assert!(out.content.contains("bash capability"));
+    }
+
+    #[tokio::test]
+    async fn network_capability_off_refuses_curl() {
+        let out = BashTool
+            .execute(
+                serde_json::json!({"command": "curl https://example.com"}),
+                &ctx_with(Capabilities::network_off()),
+            )
+            .await
+            .unwrap();
+        assert!(out.is_error);
+        assert!(out.content.contains("network"));
+    }
+
+    #[tokio::test]
+    async fn network_capability_off_allows_ls() {
+        let c = ctx_with(Capabilities::network_off());
+        #[cfg(target_os = "windows")]
+        let cmd = "dir";
+        #[cfg(not(target_os = "windows"))]
+        let cmd = "ls";
+        let out = BashTool
+            .execute(serde_json::json!({"command": cmd}), &c)
+            .await
+            .unwrap();
+        assert!(!out.is_error);
+    }
+
+    #[test]
+    fn looks_like_network_positive_cases() {
+        assert!(super::looks_like_network("curl https://x"));
+        assert!(super::looks_like_network("wget -q -O- https://x"));
+        assert!(super::looks_like_network("git clone https://x"));
+        assert!(super::looks_like_network("npm install foo"));
+        assert!(super::looks_like_network("ping 8.8.8.8"));
+    }
+
+    #[test]
+    fn looks_like_network_negative_cases() {
+        assert!(!super::looks_like_network("ls -la"));
+        assert!(!super::looks_like_network("echo hello"));
+        assert!(!super::looks_like_network("node server.js"));
     }
 }

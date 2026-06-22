@@ -39,6 +39,9 @@ impl Tool for WriteTool {
         args: serde_json::Value,
         ctx: &ToolContext,
     ) -> Result<ToolOutput, ToolError> {
+        if !ctx.capabilities.write {
+            return Ok(ToolOutput::err("refused: write capability disabled"));
+        }
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -107,6 +110,7 @@ mod tests {
         let ctx = ToolContext {
             workspace: Workspace::new(dir.path(), "t"),
             approved: false,
+            ..Default::default()
         };
         let out = WriteTool
             .execute(serde_json::json!({"path": "a.txt", "content": "hi"}), &ctx)
@@ -123,6 +127,7 @@ mod tests {
         let ctx = ToolContext {
             workspace: Workspace::new(dir.path(), "t"),
             approved: false,
+            ..Default::default()
         };
         WriteTool
             .execute(serde_json::json!({"path": "a.txt", "content": "new"}), &ctx)

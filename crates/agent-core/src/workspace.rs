@@ -17,6 +17,12 @@ pub struct Workspace {
     pub name: String,
 }
 
+impl Default for Workspace {
+    fn default() -> Self {
+        Self { root: PathBuf::from("."), name: ".".into() }
+    }
+}
+
 impl Workspace {
     /// Build a workspace from an existing path.
     pub fn new(root: impl Into<PathBuf>, name: impl Into<String>) -> Self {

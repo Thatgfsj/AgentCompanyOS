@@ -38,6 +38,9 @@ impl Tool for ReadTool {
         args: serde_json::Value,
         ctx: &ToolContext,
     ) -> Result<ToolOutput, ToolError> {
+        if !ctx.capabilities.read {
+            return Ok(ToolOutput::err("refused: read capability disabled"));
+        }
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -89,6 +92,7 @@ mod tests {
         let ctx = ToolContext {
             workspace: Workspace::new(dir.path(), "t"),
             approved: false,
+            ..Default::default()
         };
         let out = ReadTool
             .execute(serde_json::json!({"path": "a.txt", "start_line": 2, "end_line": 2}), &ctx)

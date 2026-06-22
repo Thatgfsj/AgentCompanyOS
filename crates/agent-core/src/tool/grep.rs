@@ -45,6 +45,9 @@ impl Tool for GrepTool {
         args: serde_json::Value,
         ctx: &ToolContext,
     ) -> Result<ToolOutput, ToolError> {
+        if !ctx.capabilities.read {
+            return Ok(ToolOutput::err("refused: read capability disabled (grep)"));
+        }
         let pattern = args
             .get("pattern")
             .and_then(|v| v.as_str())

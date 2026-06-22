@@ -84,6 +84,80 @@ pub struct ToolContext {
     /// potentially-destructive actions. Tools like `write` and
     /// `patch` may bypass some safety checks when this is true.
     pub approved: bool,
+    /// Fine-grained capabilities. Default = everything on.
+    /// Construct non-default contexts with [`Capabilities::read_only`],
+    /// [`Capabilities::network_off`], etc.
+    pub capabilities: Capabilities,
+}
+
+impl Default for ToolContext {
+    fn default() -> Self {
+        Self {
+            workspace: Workspace::default(),
+            approved: true,
+            capabilities: Capabilities::default(),
+        }
+    }
+}
+
+impl ToolContext {
+    /// New context with all capabilities enabled. Use this when
+    /// the agent is running in "trusted" mode (e.g. dev with the
+    /// user watching).
+    pub fn new(workspace: Workspace) -> Self {
+        Self {
+            workspace,
+            approved: true,
+            capabilities: Capabilities::default(),
+        }
+    }
+}
+
+/// Per-tool permission flags.
+///
+/// All flags default to `true` (everything allowed). Construct a
+/// stricter context when needed:
+///
+/// ```ignore
+/// let caps = Capabilities::read_only();
+/// let ctx = ToolContext { workspace, approved: true, capabilities: caps };
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Capabilities {
+    /// `read` tool, and any other read-style ops.
+    pub read: bool,
+    /// `write`, `patch` — files may be modified or created.
+    pub write: bool,
+    /// `bash` — child processes may be spawned.
+    pub bash: bool,
+    /// Outbound network from `bash` is allowed (curl, wget, npm
+    /// install, …). Combined with `bash=false`, this is a no-op.
+    pub network: bool,
+}
+
+impl Default for Capabilities {
+    fn default() -> Self {
+        Self { read: true, write: true, bash: true, network: true }
+    }
+}
+
+impl Capabilities {
+    /// File reading + `bash` for inspection commands, but no
+    /// modification or outbound network.
+    pub fn read_only() -> Self {
+        Self { read: true, write: false, bash: true, network: false }
+    }
+    /// Completely locked down: nothing but `read`. Useful for
+    /// the "inspect this codebase" mode where the user wants
+    /// the agent to plan but not touch anything yet.
+    pub fn no_modify() -> Self {
+        Self { read: true, write: false, bash: false, network: false }
+    }
+    /// No outbound network from `bash`, but local file ops and
+    /// local subprocesses are fine.
+    pub fn network_off() -> Self {
+        Self { read: true, write: true, bash: true, network: false }
+    }
 }
 
 /// A tool the agent can call.
@@ -203,5 +277,23 @@ mod tests {
         assert_eq!(o.content, "hi");
         let e = ToolOutput::err("nope");
         assert!(e.is_error);
+    }
+
+    #[test]
+    fn capabilities_read_only_disables_write() {
+        let caps = Capabilities::read_only();
+        assert!(caps.read);
+        assert!(!caps.write);
+        assert!(caps.bash);
+        assert!(!caps.network);
+    }
+
+    #[test]
+    fn capabilities_no_modify_disables_bash() {
+        let caps = Capabilities::no_modify();
+        assert!(caps.read);
+        assert!(!caps.write);
+        assert!(!caps.bash);
+        assert!(!caps.network);
     }
 }

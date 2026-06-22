@@ -318,3 +318,104 @@ async fn read_and_write_tools_round_trip() {
     let on_disk = std::fs::read_to_string(tmp.path().join("hello.txt")).unwrap();
     assert_eq!(on_disk, "hi rust");
 }
+/// Same tool call with the same args failing 3 times in a row
+/// should ABORT the loop with `ABORTED_REPEAT` instead of letting
+/// it eat the full max_iterations budget.
+///
+/// To force failures we script a tool call with arguments that
+/// the bash tool will refuse on this platform: `bash` with
+/// dangerous pattern.
+#[tokio::test(flavor = "current_thread")]
+async fn repeat_failure_aborts_before_max_iterations() {
+    // The bash tool refuses `rm -rf /` when `approved` is false.
+    // Repeat the SAME call 3 times and assert ABORTED_REPEAT.
+    let provider = Arc::new(ScriptedProvider::scripted(
+        "test-repeat",
+        vec![
+            // Provider call 1: bash rm -rf / (refused)
+            vec![ScriptStep::ToolCall {
+                id: "r1".into(),
+                name: "bash",
+                args: serde_json::json!({"command": "rm -rf /"}),
+            }],
+            // Provider call 2: same
+            vec![ScriptStep::ToolCall {
+                id: "r2".into(),
+                name: "bash",
+                args: serde_json::json!({"command": "rm -rf /"}),
+            }],
+            // Provider call 3: same — this should NOT be reached,
+            // because ABORTED_REPEAT fires after the 2nd failure.
+            vec![ScriptStep::ToolCall {
+                id: "r3".into(),
+                name: "bash",
+                args: serde_json::json!({"command": "rm -rf /"}),
+            }],
+            // Provider call 4 (safety): empty script
+            vec![ScriptStep::Done],
+        ],
+    ));
+    let tools = Arc::new(ToolRegistry::with_builtins());
+    let ws = Workspace::new(std::env::temp_dir(), "repeat-test");
+    let agent = Agent::new(
+        agent_core::prompt::Role::Worker,
+        provider,
+        tools,
+        ws,
+        AgentConfig {
+            // Set high so we know it's the repeat detector, not the cap,
+            // that bails us out.
+            max_iterations: 20,
+            repeat_abort_after: 3,
+            ..Default::default()
+        },
+    );
+
+    let rx = agent.run("force repeat failures");
+    let events = collect_until_done(rx).await;
+
+    // First we must see Done with status ABORTED_REPEAT.
+    let last = events.last().expect("expected at least one event");
+    let status = match last {
+        AgentEvent::Done { status, .. } => status.clone(),
+        other => panic!("expected Done as last event, got {other:?}"),
+    };
+    assert_eq!(status, "ABORTED_REPEAT", "events: {events:#?}");
+
+    // We should have seen exactly 3 tool failures (and 0 successes).
+    let failures: usize = events
+        .iter()
+        .filter(|e| matches!(e, AgentEvent::ToolFinished { is_error: true, .. }))
+        .count();
+    assert_eq!(failures, 3, "expected exactly 3 failures, events: {events:#?}");
+}
+
+/// Capability `read_only` makes the `write` tool refuse at the
+/// gate. The agent loop should see is_error=true and surface it.
+#[tokio::test(flavor = "current_thread")]
+async fn read_only_capability_blocks_write_tool() {
+    use agent_core::tool::{Capabilities, ToolContext};
+
+    // We can't plumb a per-run ToolContext through the public API
+    // yet (loop_.rs hard-codes a default ToolContext). So this
+    // test exercises the gate at the ToolRegistry level directly,
+    // which is what the loop also calls.
+    let reg = ToolRegistry::with_builtins();
+    let ws = Workspace::new(std::env::temp_dir(), "ro-test");
+    let read_only_ctx = ToolContext {
+        workspace: ws,
+        approved: true,
+        capabilities: Capabilities::read_only(),
+    };
+
+    let out = reg
+        .execute(
+            "write",
+            serde_json::json!({"path": "should_not_exist.txt", "content": "no"}),
+            &read_only_ctx,
+        )
+        .await
+        .expect("execute should return");
+    assert!(out.is_error, "write should be refused");
+    assert!(out.content.contains("write capability"));
+}
