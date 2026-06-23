@@ -225,12 +225,10 @@ mod tests {
 
     #[tokio::test]
     async fn echoes_command() {
-        #[cfg(target_os = "windows")]
-        let cmd = "echo hello";
-        #[cfg(not(target_os = "windows"))]
-        let cmd = "echo hello";
+        // `echo` is built into both cmd.exe and bash; the test is
+        // cross-platform without any cfg gates.
         let out = BashTool
-            .execute(serde_json::json!({"command": cmd}), &ctx())
+            .execute(serde_json::json!({"command": "echo hello"}), &ctx())
             .await
             .unwrap();
         assert!(!out.is_error);
@@ -251,12 +249,8 @@ mod tests {
     async fn approved_can_run_dangerous() {
         let mut c = ctx();
         c.approved = true;
-        #[cfg(target_os = "windows")]
-        let cmd = "echo approved";
-        #[cfg(not(target_os = "windows"))]
-        let cmd = "echo approved";
         let out = BashTool
-            .execute(serde_json::json!({"command": cmd}), &c)
+            .execute(serde_json::json!({"command": "echo approved"}), &c)
             .await
             .unwrap();
         assert!(!out.is_error);
@@ -304,17 +298,14 @@ mod cap_tests {
     }
 
     #[tokio::test]
-    async fn network_capability_off_allows_ls() {
+    async fn network_capability_off_allows_local_commands() {
+        // `echo` is cross-platform and doesn't touch the network.
         let c = ctx_with(Capabilities::network_off());
-        #[cfg(target_os = "windows")]
-        let cmd = "dir";
-        #[cfg(not(target_os = "windows"))]
-        let cmd = "ls";
         let out = BashTool
-            .execute(serde_json::json!({"command": cmd}), &c)
+            .execute(serde_json::json!({"command": "echo local"}), &c)
             .await
             .unwrap();
-        assert!(!out.is_error);
+        assert!(!out.is_error, "local command must run, got: {}", out.content);
     }
 
     #[test]
@@ -347,6 +338,9 @@ mod cap_tests {
         };
         ctx.capabilities.network = true;
 
+        // The command we cancel must take noticeably longer than
+        // the cancel deadline so we observe the kill, not the
+        // natural exit.
         #[cfg(target_os = "windows")]
         let cmd = "ping -n 30 127.0.0.1 > nul";
         #[cfg(not(target_os = "windows"))]

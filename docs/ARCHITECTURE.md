@@ -143,6 +143,12 @@ crates/agent-core/src/
 │   └── anthropic_adapter.rs   Optional adapter: translates Anthropic Messages
 │                              API ↔ OpenAI Chat Completions for users who
 │                              need direct Anthropic support without a proxy.
+│                              **Not yet implemented (v0.3).** Direct
+│                              Anthropic users should run through an
+│                              OpenAI-compat proxy (Bedrock, LiteLLM)
+│                              for now; or send a patch that introduces
+│                              the adapter following the protocol in
+│                              `crates/agent-core/src/provider/anthropic.rs`.
 ├── prompt/
 │   ├── system.rs       system prompts per role (首席 / 缺陷猎手 / 工匠 / ...)
 │   └── template.rs     placeholder substitution + context injection

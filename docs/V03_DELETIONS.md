@@ -30,7 +30,7 @@ adapter):
 
 | Path | Reason |
 |------|--------|
-| `crates/agent-core/src/provider/anthropic.rs` | First-class Anthropic client. Replaced by `anthropic_adapter.rs` that translates to/from OpenAI shape (or removed entirely if proxy is universal). |
+| `crates/agent-core/src/provider/anthropic.rs` | First-class Anthropic client. Replaced by `anthropic_adapter.rs` (also not yet created) that translates to/from OpenAI shape, or removed entirely if proxy is universal. |
 
 ## Phase 3: Workspace + settings polish
 

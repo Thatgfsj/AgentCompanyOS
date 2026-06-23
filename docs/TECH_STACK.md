@@ -158,7 +158,7 @@ All crates share a Cargo workspace at the repo root.
   crash, JSON-extraction fragility, non-streamable progress)
 
 **Migration:** all agent logic ported to `crates/agent-core/`. All
-provider HTTP calls ported to `crates/agent-core/src/providers/`.
+provider HTTP calls ported to `crates/agent-core/src/provider/`.
 All tool implementations ported to `crates/agent-core/src/tools/`.
 
 ---

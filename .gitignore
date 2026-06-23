@@ -98,6 +98,10 @@ out/
 *.deb
 *.rpm
 *.AppImage
-Cargo.lock
-Cargo.lock
+
+# ─── Rust ────────────────────────────────────────────────
+# Cargo.lock IS committed (the apps are binaries, not a library
+# crate — see docs/TECH_STACK.md §2). Do NOT add `Cargo.lock`
+# to this file; if you need to ignore it temporarily for a
+# test, use `git update-index --skip-worktree`.
 apps/desktop/src-tauri/binaries/

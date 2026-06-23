@@ -176,6 +176,25 @@ plugin UI panels.
 - ❌ Resource quotas (max files written, max bytes served
   by `read`, etc.)
 
+**API changes from v0.3 (worth noting if/when we publish):**
+
+- `agent_core::message::ChatMessage` was a `type ChatMessage
+  = Message;` alias. Removed because nobody used it; the
+  one true name is `agent_core::Message`.
+- `agent_core::message::ToolResult` was a struct that was
+  never constructed; loop_.rs always built a `Message::tool`
+  directly. Removed.
+- `pipe_server::{Handler, HandlerFuture}` were types
+  internal to `Dispatcher`; removed from the public
+  re-export list.
+- `agent_core::tool::Capabilities` is now publicly
+  re-exported under `agent_core::Capabilities`.
+
+No external users yet (v0.x pre-release); if/when this becomes
+a published crate, these removals would warrant a `v0.4.0`
+minor bump under semver, or a `v0.3.1` with a `#[deprecated]`
+shim if backwards compatibility matters.
+
 ---
 
 ### v0.5 — Memory & Replay
