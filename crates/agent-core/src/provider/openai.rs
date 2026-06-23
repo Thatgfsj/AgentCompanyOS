@@ -34,6 +34,34 @@ pub struct OpenAiProvider {
     pub api_key: String,
 }
 
+/// Validate a base URL passed in by the user (ChatZone input,
+/// env var, …). Catches the common mistakes before we waste a
+/// network round trip on a 30-second TLS handshake to nowhere.
+///
+/// Returns the cleaned-up form (trailing slash stripped).
+pub fn validate_base_url(input: &str) -> Result<String, String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return Err("base URL is empty".into());
+    }
+    let parsed = url::Url::parse(trimmed)
+        .map_err(|e| format!("base URL is not a valid URL ({e})"))?;
+    match parsed.scheme() {
+        "http" | "https" => {}
+        other => return Err(format!("base URL scheme must be http or https (got {other})")),
+    }
+    if parsed.host_str().is_none_or(str::is_empty) {
+        return Err("base URL is missing a host".into());
+    }
+    let mut s = parsed.to_string();
+    // Normalise: strip trailing slash for consistency with
+    // `OpenAiProvider::compat` (which does `.trim_end_matches('/')`).
+    if s.ends_with('/') {
+        s.pop();
+    }
+    Ok(s)
+}
+
 impl OpenAiProvider {
     /// Build a provider for the OpenAI public API.
     pub fn openai(model: impl Into<String>, api_key: impl Into<String>) -> Self {
@@ -58,7 +86,21 @@ impl OpenAiProvider {
             api_key: api_key.into(),
         }
     }
+
+    /// Build a provider for any OpenAI-compatible endpoint after
+    /// validating the URL. Returns a clean error if the URL is
+    /// malformed, instead of letting the HTTP layer surface a
+    /// confusing `connection refused` / `invalid URL` later.
+    pub fn compat_checked(
+        base_url: &str,
+        model: impl Into<String>,
+        api_key: impl Into<String>,
+    ) -> Result<Self, String> {
+        let cleaned = validate_base_url(base_url)?;
+        Ok(Self::compat(cleaned, model, api_key))
+    }
 }
+
 
 #[async_trait]
 impl Provider for OpenAiProvider {
@@ -363,5 +405,73 @@ mod tests {
         assert!(json.contains("\"role\":\"system\""));
         assert!(json.contains("\"role\":\"tool\""));
         assert!(json.contains("\"tool_calls\""));
+    }
+
+    #[test]
+    fn validate_base_url_accepts_clean_https() {
+        assert_eq!(
+            validate_base_url("https://api.openai.com/v1").unwrap(),
+            "https://api.openai.com/v1"
+        );
+    }
+
+    #[test]
+    fn validate_base_url_strips_trailing_slash() {
+        assert_eq!(
+            validate_base_url("https://api.openai.com/v1/").unwrap(),
+            "https://api.openai.com/v1"
+        );
+    }
+
+    #[test]
+    fn validate_base_url_accepts_http_and_https() {
+        assert!(validate_base_url("http://localhost:8080/v1").is_ok());
+        assert!(validate_base_url("https://api.deepseek.com").is_ok());
+    }
+
+    #[test]
+    fn validate_base_url_rejects_empty() {
+        assert!(validate_base_url("").is_err());
+        assert!(validate_base_url("   ").is_err());
+    }
+
+    #[test]
+    fn validate_base_url_rejects_no_scheme() {
+        let err = validate_base_url("api.openai.com/v1").unwrap_err();
+        assert!(err.contains("URL") || err.contains("scheme"));
+    }
+
+    #[test]
+    fn validate_base_url_rejects_wrong_scheme() {
+        let err = validate_base_url("ftp://example.com").unwrap_err();
+        assert!(err.contains("scheme") || err.contains("http"));
+    }
+
+    #[test]
+    fn validate_base_url_rejects_no_host() {
+        // "://no-scheme" lacks both a scheme and a host; url will
+        // refuse to parse it at all.
+        let err = validate_base_url("://no-scheme").unwrap_err();
+        assert!(err.contains("URL") || err.contains("scheme"));
+    }
+
+    #[test]
+    fn compat_checked_returns_clean_error_on_bad_url() {
+        let err = compat_checked_for_test("not a url", "m", "k").unwrap_err();
+        assert!(err.contains("URL") || err.contains("scheme"));
+    }
+
+    #[test]
+    fn compat_checked_strips_trailing_slash() {
+        let p = compat_checked_for_test("https://x.test/v1/", "m", "k").unwrap();
+        assert!(!p.base_url.ends_with('/'));
+    }
+
+    fn compat_checked_for_test(
+        url: &str,
+        m: &str,
+        k: &str,
+    ) -> Result<OpenAiProvider, String> {
+        OpenAiProvider::compat_checked(url, m.to_string(), k.to_string())
     }
 }

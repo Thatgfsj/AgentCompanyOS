@@ -93,8 +93,9 @@ async fn run_task(body: Value, state: Arc<ServerState>) -> Result<(u16, Value), 
     let base_url = body
         .get("base_url")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| "missing 'base_url'".to_string())?
-        .to_string();
+        .ok_or_else(|| "missing 'base_url'".to_string())?;
+    let base_url = agent_core::provider::openai::validate_base_url(base_url)
+        .map_err(|e| format!("invalid base_url: {e}"))?;
     let model = body
         .get("model")
         .and_then(|v| v.as_str())

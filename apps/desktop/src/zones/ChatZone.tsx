@@ -16,7 +16,7 @@
  *   - tool timeline (with command preview)
  *   - token usage + final status
  */
-import { useCallback, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useAgentStream, type AgentEvent } from '../hooks/useAgentStream.js';
 
 interface RoleSpec {
@@ -77,6 +77,19 @@ export function ChatZone({
     () => events.filter((e) => e.kind === 'tool_started' || e.kind === 'tool_finished'),
     [events],
   );
+
+  // Auto-scroll the transcript as text streams in. Disable when
+  // the user has scrolled up to read history; re-engage when they
+  // jump back to the bottom.
+  useEffect(() => {
+    const el = transcriptRef.current;
+    if (!el) return;
+    const nearBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 64;
+    if (nearBottom) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [text, events.length]);
 
   const send = useCallback(async () => {
     const trimmed = task.trim();
