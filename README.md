@@ -1,281 +1,272 @@
 # Agent Company OS (ACO)
 
-> A Visual AI Software Company Powered by Multi-Agent Workflow
+> **A Visual AI Software Company Powered by Multi-Agent Workflow**
+>
+> **Status:** v0.4 in development — single-process Rust runtime
+> (no Python sidecar). Acceptance run #3 reported **PASS** with
+> 28 backend tests + 6 Playwright scenarios on 2026-06-24.
+>
+> **Latest release:** v0.2.5 (Tauri installer build verified)
+>
+> **Author:** Thatgfsj
+> **License:** MIT
 
-[![Release](https://img.shields.io/badge/release-v0.2.2-blue)](https://github.com/Thatgfsj/AgentCompanyOS/releases/tag/v0.2.2)
-[![License](https://img.shields.io/badge/license-MIT-green)]()
-[![RFCs](https://img.shields.io/badge/RFCs-15-orange)]()
-[![Tests](https://img.shields.io/badge/tests-153%20passing-brightgreen)]()
-[![Windows](https://img.shields.io/badge/windows-installer-blueviolet)](https://github.com/Thatgfsj/AgentCompanyOS/releases/tag/v0.2.2)
+ACO is not another AI IDE. It is an **AI Software Company
+Operating System**.
 
-**ACO is not another AI IDE. It is an AI Software Company Operating System.**
-
-Users interact with a beautiful visual workspace while multiple AI agents
-collaborate behind the scenes — exactly like a real software company:
-
-```
-User → Chief Agent → Planning → Critic Review → Workers → Review → Delivery
-```
-
-The IDE is only the visualization layer. **The workflow is the product.**
-
----
-
-## 📚 Documentation
-
-All design decisions live in versioned RFCs under [`docs/`](./docs/).
-
-### RFCs — design contracts
-
-| Document | Purpose |
-|----------|---------|
-| [PROJECT_SPEC.md](./PROJECT_SPEC.md) | Top-level product vision, philosophy, agents, workflow, roadmap |
-| [docs/TECH_STACK.md](./docs/TECH_STACK.md) | Locked-in tech: Tauri + Rust + React 19 + Python runtime, monorepo layout |
-| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | End-to-end architecture: data flow, module boundaries, cross-language contracts |
-| [docs/WORKFLOW_SPEC.md](./docs/WORKFLOW_SPEC.md) | 8-phase state machine, transitions, budgets, replay format |
-| [docs/AGENT_PROTOCOL.md](./docs/AGENT_PROTOCOL.md) | Inter-agent message envelope, task lifecycle, isolation rules |
-| [docs/PROVIDER_SPEC.md](./docs/PROVIDER_SPEC.md) | Multi-provider model layer (Anthropic / OpenAI / Gemini / etc.) |
-| [docs/UI_GUIDELINES.md](./docs/UI_GUIDELINES.md) | Mission Control UI design system, layout, components, themes |
-| [docs/PROMPT_GUIDE.md](./docs/PROMPT_GUIDE.md) | Per-agent prompt templates and authoring rules |
-| [docs/PLUGIN_SPEC.md](./docs/PLUGIN_SPEC.md) | Plugin interface (Git / Docker / MCP / Browser / etc.) |
-| [docs/STORAGE_SPEC.md](./docs/STORAGE_SPEC.md) | SQLite schema, FTS5, JSONL log, backup/recovery |
-| [docs/TASK_GRAPH.md](./docs/TASK_GRAPH.md) | Plan DAG, scheduling, parallelism, repair sub-graphs |
-| [docs/SECURITY.md](./docs/SECURITY.md) | Threat model, secrets, sandbox, audit |
-| [docs/CONFIG.md](./docs/CONFIG.md) | Config hierarchy, schemas, validation |
-| [docs/ROADMAP.md](./docs/ROADMAP.md) | Long-term versioning, milestones, deprecations |
-| [docs/FAQ.md](./docs/FAQ.md) | Frequently asked questions |
-
-### Prompts — runnable agent system prompts
-
-In [`prompts/`](./prompts/):
-
-| File | Role |
-|------|------|
-| [bootstrap.md](./prompts/bootstrap.md) | Initial system prompt for every agent |
-| [chief_agent.md](./prompts/chief_agent.md) | Chief Agent (orchestrator) |
-| [critic_a.md](./prompts/critic_a.md) | Critic A — bug hunter |
-| [critic_b.md](./prompts/critic_b.md) | Critic B — architect |
-| [worker.md](./prompts/worker.md) | Generic Worker |
-| [planner.md](./prompts/planner.md) | Planner sub-role |
-| [reporter.md](./prompts/reporter.md) | Reporter (final summary) |
-| [merger.md](./prompts/merger.md) | Merger (combine parallel worker outputs) |
-
-### Plans — phased implementation roadmap
-
-In [`plans/`](./plans/):
-
-| File | Phase |
-|------|-------|
-| [Phase0.md](./plans/Phase0.md) | Foundation: monorepo scaffold, CI, RFCs |
-| [Phase1.md](./plans/Phase1.md) | Minimal runtime: state machine + Anthropic + 1 e2e test |
-| [Phase2.md](./plans/Phase2.md) | Task graph + multi-provider failover + first 3 plugins |
-| [Phase3.md](./plans/Phase3.md) | Memory + replay + cost dashboard + i18n |
-| [Phase4.md](./plans/Phase4.md) | Real-world plugins + marketplace + house-style prompts |
-| [Phase5.md](./plans/Phase5.md) | Live2D + voice (Whisper + Piper) + streaming |
-| [ReleasePlan.md](./plans/ReleasePlan.md) | Releases, branching, support policy, dogfooding |
-
-### Agent rules — what the runtime (and humans) must follow
-
-In [`.agent/`](./.agent/):
-
-| File | Scope |
-|------|-------|
-| [coding_rules.md](./.agent/coding_rules.md) | Languages, style, naming, errors, tests, deps |
-| [ui_rules.md](./.agent/ui_rules.md) | React 19 + Tailwind v4 + shadcn/ui conventions |
-| [commit_rules.md](./.agent/commit_rules.md) | Conventional commits + signing + PR flow |
-| [architecture_rules.md](./.agent/architecture_rules.md) | Module deps, IPC, DB, schemas, forbidden patterns |
-
-> **Convention:** Anything in `docs/` is a *Request For Comments* — proposals
-> are reviewed before implementation. Once accepted, the RFC is the source of
-> truth for that subsystem.
-
----
-
-## 🚀 5-minute demo (no API key needed)
-
-```bash
-# 1. Install runtime + deps (already in apps/desktop/ if you cloned the
-#    monorepo; otherwise pip install -e runtime).
-pip install -e ./runtime
-
-# 2. Run an end-to-end multi-agent workflow. Uses the deterministic
-#    MockProvider so no LLM API key is required.
-python -m aco_runtime_lib demo "Write an is_prime function with pytest tests"
-
-# Expected output (abridged):
-#   ACO runtime demo — end-to-end multi-agent workflow
-#   Request: 'is_prime'
-#
-#   Result  state: DONE
-#           tasks : 2
-#           LLM   : 4 calls
-#           time  : 0.01s
-#
-#   Delivery summary:
-#   # Delivery Summary
-#   ## What was built
-#   - is_prime checks n>1 then trial-divides up to sqrt(n)
-#   ...
-```
-
-The demo exercises the full state machine (Chief → Planner →
-Critic → Worker ×2 → Reporter → FinalReviewer → DONE) using the
-real orchestrator code. Swap the `MockProvider` for a real
-provider (set `MINIMAX_API_KEY` in the OS keychain via the
-Settings UI) to see the same flow with real LLM calls.
-
----
-
-## 🏗️ Status
-
-**Current version:** [`v0.2.5`](https://github.com/Thatgfsj/AgentCompanyOS/releases/tag/v0.2.5)
-(Phase 2 complete: task graph + multi-provider + plugins.)
-
-| Milestone | Status |
-|-----------|--------|
-| Phase 0 — Foundation (monorepo, CI, RFCs, Windows installer) | ✅ Done |
-| Phase 1 — Minimal runtime (state machine, JSONL replay, 1 e2e test) | ✅ Done |
-| Phase 2.1 — Plan parser (Markdown → DAG, strict mode) | ✅ Done |
-| Phase 2.2 — Plan validator (cycles, budget, max-nodes) | ✅ Done |
-| Phase 2.3 — Plan scheduler (topological, fair, repair subgraph) | ✅ Done |
-| Phase 2.4 — React Flow UI for plan graph | ✅ Done |
-| Phase 2.5–2.10 — Multi-provider failover | ✅ Done |
-| Phase 2.11–2.12 — Failover chain + retry | ✅ Done |
-| Phase 2.13–2.17 — Plugin system (git/python/docker/mcp) + UI | ✅ Done |
-| Phase 2.18 — Per-task console + task tree | ✅ Done |
-| Phase 3 — Memory + replay + cost dashboard | ⏳ Planned |
-| v1.0 — Complete AI Software Company | 🎯 Target |
-
-**Verified working end-to-end (v0.2.5):**
-- 155 runtime tests passing
-- Workflow `POST /api/workflow` → plan → workers → FinalReviewer → DONE
-- `GET /api/workflow/{id}/plan` returns live `parsed_plan` + `task_statuses`
-- React Flow plan graph visualization
-- 5 built-in plugins (echo, python, git, docker, mcp)
-- Per-task console + task tree UI
-- OS-keychain secret store (Windows Credential Manager)
-- Bundled Python runtime — **no Python installation required**
-- Windows installer: NSIS 39 MB + MSI 40 MB
-
-## 📦 Installation (Windows)
-
-1. Download the NSIS installer (`Agent Company OS_x.x.x_x64-setup.exe`) from [Releases](https://github.com/Thatgfsj/AgentCompanyOS/releases)
-2. Run the installer
-3. If Windows SmartScreen shows a warning:
-   - Click **"More info"**
-   - Click **"Run anyway"**
-   - This is expected for unsigned applications
-4. Launch "Agent Company OS" from the Start Menu
-
-> **No Python installation required** — the Python runtime is bundled in the installer.
-
-See [plans/](./plans/) and [docs/ROADMAP.md](./docs/ROADMAP.md) for details.
-
----
-
-## 🛠️ Tech Stack
-
-Locked-in for v0.1 — see [docs/TECH_STACK.md](./docs/TECH_STACK.md) for the full picture.
-
-* **Desktop shell:** Tauri v2 + Rust + React 19 + TypeScript + Vite
-* **Frontend:** Tailwind v4 · shadcn/ui · Zustand · TanStack Query · Motion · Monaco · Xterm.js · React Flow
-* **Backend (Rust):** Tokio · Tauri IPC · Serde · SQLx · SQLite + FTS5 · portable-pty · Crossbeam
-* **AI Runtime (Python 3.12+):** FastAPI · Uvicorn · Pydantic v2 · asyncio · Loguru · Tenacity · Rich
-* **Agent Framework:** Custom workflow engine, event bus, task-graph scheduler, prompt engine, model router
-* **AI SDKs:** Anthropic · OpenAI · Google GenAI · MiniMax · Moonshot (Kimi) · DeepSeek · OpenRouter · Ollama · LM Studio · OpenAI-compatible (only `minimax` + `deepseek` verified end-to-end in v0.2.2; others implemented but not smoke-tested)
-* **Execution:** Plugin ABC with structured args; `portable-pty` for Claude Code CLI as one possible backend, but **not** the only path — `echo`/`python`/`git` plugins ship in-tree
-* **Plugins:** Structured plugin API (Python / git / echo shipped; MCP / Docker / Browser are stubs)
-* **Testing:** Vitest · Playwright · cargo test · pytest
-* **CI:** GitHub Actions (clippy · rustfmt · ruff · black · mypy · eslint · prettier)
-
----
-
-## 🗂️ Repository Layout
+Users interact with a visual workspace while multiple AI agents
+collaborate behind the scenes — exactly like a real software
+company:
 
 ```
-AgentCompanyOS/
-├── README.md              ← you are here
-├── LICENSE                ← MIT
-├── CONTRIBUTING.md        ← how to contribute
-│
-├── docs/                  ← 15 RFCs (PROPOSALS/, WORKFLOW_SPEC, TASK_GRAPH, …)
-├── prompts/               ← 8 runnable agent prompts (Chief, Planner, …)
-├── plans/                 ← 7 phase plans
-├── .agent/                ← 4 rule files (CLAUDE.md etc.)
-│
-├── apps/                   ← runtime + desktop shells
-│   ├── desktop/           ← Tauri v2 app (TypeScript + Rust)
-│   └── runtime/           ← Python FastAPI sidecar (aco_runtime/)
-│
-├── packages/              ← pnpm workspace (TS shared types/components)
-│   ├── ui/                ← React 19 components
-│   ├── workflow/          ← workflow client types
-│   ├── providers/         ← provider metadata
-│   ├── prompts/           ← prompt renderer
-│   └── shared/            ← cross-language types (WfEvent mirror)
-│
-├── crates/                ← Cargo workspace — Tauri-side glue only
-│   ├── tauri-core/        ← Tauri commands, AppState
-│   ├── event-bus/         ← Rust event types (mirror of shared/events.ts)
-│   ├── claude-adapter/    ← portable-pty Claude Code CLI runner
-│   ├── config/            ← aco.toml loader
-│   └── storage/           ← sqlx + SQLite + FTS5 (Phase 2 stub)
-│
-├── runtime/               ← uv workspace — the actual product
-│   ├── pyproject.toml
-│   ├── src/
-│   │   └── aco_runtime_lib/      ← the runtime library
-│   │       ├── agents/            ← Chief, Planner, Worker, Critic, Reporter, FinalReviewer
-│   │       ├── workflow/          ← orchestrator + state machine
-│   │       │                       + plan_parser / plan_validator / plan_scheduler
-│   │       ├── providers/         ← model router (12+ providers, keychain-backed)
-│   │       ├── plugins/           ← Plugin ABC + builtin/{echo,python,git}
-│   │       ├── prompts/           ← Jinja-style prompt renderer
-│   │       ├── memory/            ← in-mem key-value (Phase 2 → SQLite)
-│   │       ├── api/               ← routes (workflow, events, providers, settings, plugins)
-│   │       ├── event_bus.py       ← pub/sub asyncio
-│   │       ├── secrets.py         ← OS-keychain SecretStore
-│   │       └── __init__.py
-│   └── tests/              ← 153 pytest tests
-│
-├── .validation/           ← smoke + e2e + icon-gen scripts
-├── .github/workflows/     ← CI (clippy · ruff · mypy · eslint · prettier)
-└── target/release/        ← Tauri build artifacts (.exe, .msi, NSIS setup)
+User → 首席 (Chief) → 军师 (Planner) → 工匠 (Worker) × N
+                                              ↓
+                  ← 缺陷猎手 (BugHunter) / 质检师 (Reviewer)
+                                              ↓
+                  ← 传令官 (Reporter) → User
 ```
 
-**Key paths:**
-- Tauri desktop app: `apps/desktop/`
-- Python AI runtime: `runtime/src/aco_runtime_lib/`
-- Phase 2 plan parser / validator / scheduler: `runtime/src/aco_runtime_lib/workflow/`
-- Plugin registry + builtin plugins: `runtime/src/aco_runtime_lib/plugins/`
-- End-to-end demo: `python -m aco_runtime_lib.demo` (see below)
+The IDE is only the visualization layer. **The workflow is the
+product.**
 
 ---
 
-## 🚀 Quickstart (planned for Phase 0)
+## ✨ What's new in v0.4
+
+* **All-Rust runtime** — the Python FastAPI sidecar and the
+  Claude Code CLI wrapper (`crates/claude-adapter/`) are
+  deleted. `crates/agent-core` is a single-process implementation
+  of the agent loop, tool registry, and provider clients.
+  See `docs/ACCEPTANCE_v0.4.md` for the boundary-test report
+  that surfaced 8 latent bugs in the previous acceptance runs.
+* **Capabilities** — `ToolContext` exposes per-tool `read /
+  write / bash / network` flags, plus `read_only()`,
+  `no_modify()`, and `network_off()` presets. The agent loop
+  honors `CancellationToken` and tree-kills the entire
+  child process tree on cancel.
+* **Repeat-failure abort** — if the same `(tool, args)` pair
+  fails three times in a row the loop emits
+  `Done { status: "ABORTED_REPEAT" }` instead of burning the
+  whole iteration budget on a loop.
+* **Role prompts rewritten** — every role now has a uniform
+  prompt skeleton (Identity / Responsibility / Out-of-scope /
+  Workflow / Output format / Tools). The Worker prompt
+  explicitly warns about the "defined but not wired up"
+  anti-pattern that hit the v0.3 ledger acceptance.
+* **Provider URL validation** — `validate_base_url()` rejects
+  bad URLs (`https:/x.test`, `ftp://`, …) before they waste a
+  TLS handshake.
+* **Strict acceptance test harness** — 28 backend cases + 6
+  Playwright scenarios. Catches FK violations, wrong response
+  shapes, missing CORS preflight, and concurrency failures
+  that previous runs missed.
+
+---
+
+## 🚀 Install (Windows)
+
+Download the installer for the latest release from
+[Releases](https://github.com/Thatgfsj/AgentCompanyOS/releases).
+
+| Artifact | When to use | Size |
+|----------|-------------|------|
+| `Agent Company OS_0.2.5_x64-setup.exe` (NSIS) | Public distribution | ~30 MB |
+| `Agent Company OS_0.2.5_x64_en-US.msi` (MSI) | Corporate / Group Policy | ~40 MB |
+| `aco-desktop.exe` (standalone) | Dev / portable | ~16 MB |
+
+SmartScreen shows "Unknown publisher" because the build is
+unsigned. Click **More info → Run anyway**. Code-signing
+documentation: [`docs/INSTALLER.md`](./docs/INSTALLER.md).
+
+**No Python, no Node.js, no toolchain on the user's machine.**
+The installer bundles everything needed.
+
+---
+
+## 🛠️ Build from source
+
+Prerequisites: Rust ≥ 1.85, Node ≥ 24, pnpm ≥ 9, Tauri CLI,
+WiX (Windows only, automatic).
 
 ```bash
 git clone https://github.com/Thatgfsj/AgentCompanyOS.git
 cd AgentCompanyOS
-pnpm install        # TypeScript deps
-cargo build         # Rust deps
-uv sync             # Python deps
-make dev            # tauri dev + python sidecar
+
+pnpm install
+
+# Build the Rust sidecar first (aco-runtime + agent-core + pipe-server).
+cargo build --release -p pipe-server
+
+# Stage the sidecar binary where the Tauri bundler expects it.
+mkdir -p apps/desktop/src-tauri/binaries
+cp target/release/aco-runtime.exe \
+   apps/desktop/src-tauri/binaries/aco_runtime-x86_64-pc-windows-msvc.exe
+
+# Build the installer.
+cd apps/desktop
+pnpm tauri:build
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full setup.
+The .msi and NSIS installers land in
+`apps/desktop/target/release/bundle/`. ~8 minutes from clean
+build, ~30 s incremental.
+
+To run the React UI without packaging:
+
+```bash
+cd apps/desktop
+pnpm tauri:dev
+```
+
+---
+
+## 📚 Architecture in one minute
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                  Tauri Webview (React 19 + Vite)                 │
+│  ChatZone  MissionControl  Settings  BottomConsole  CommandDock  │
+└─────────────────────────┬────────────────────────────────────────┘
+                          │ tauri::command
+┌─────────────────────────┴────────────────────────────────────────┐
+│                aco-runtime (Rust, single process)                │
+│                                                                  │
+│   crates/pipe-server    JSON-RPC over \\.\pipe\aco_runtime       │
+│     ↓                                                            │
+│   crates/agent-core     in-process agent loop + tool registry    │
+│     ↓                  + provider clients (SSE)                   │
+│     ↓                                                            │
+│   crates/event-bus      pub/sub (Rust ↔ Tauri webview)           │
+│     ↓                                                            │
+│   crates/storage        sqlx + SQLite (workflows, usage)          │
+│                                                                  │
+│   crates/provider-presets  built-in OpenAI/Anthropic/...         │
+└──────────────────────────────────────────────────────────────────┘
+                          │ HTTPS
+                          ▼
+                  LLM Provider APIs
+```
+
+See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full
+module-boundary spec and data-flow diagrams.
+
+---
+
+## 🗂️ Repository layout
+
+```
+AgentCompanyOS/
+├── apps/
+│   └── desktop/                # Tauri v2 app (React + Rust sidecar)
+│
+├── crates/                     # Cargo workspace — all Rust
+│   ├── agent-core/             # ⭐ in-process agent loop, tools, providers
+│   ├── pipe-server/            # ⭐ JSON-RPC + event-push over named pipe
+│   ├── event-bus/              # Rust pub/sub
+│   ├── tauri-core/             # Tauri app glue
+│   ├── config/                 # aco.toml loader
+│   └── storage/                # SQLx repositories
+│
+├── packages/                   # pnpm workspace (TS shared)
+│   ├── ui/                     # React 19 components
+│   ├── workflow/               # workflow client types
+│   ├── providers/              # provider metadata tables
+│   ├── prompts/                # prompt renderer (TS)
+│   └── shared/                 # cross-language types
+│
+├── docs/                       # RFCs and acceptance reports
+│   ├── ROADMAP.md              # milestones, versioning
+│   ├── ARCHITECTURE.md         # data flow, module boundaries
+│   ├── TECH_STACK.md           # locked-in tech
+│   ├── AGENT_PROTOCOL.md       # inter-agent envelopes
+│   ├── DEPENDENCIES.md         # cargo-deny advisory summary
+│   ├── INSTALLER.md            # build steps, signing, auto-update
+│   ├── ACCEPTANCE_v0.3.md      # first acceptance run
+│   ├── ACCEPTANCE_v0.3_LEDGER.md
+│   ├── ACCEPTANCE_v0.4.md      # ⭐ strict acceptance (28 backend + 6 UI)
+│   ├── DEPRECATIONS.md
+│   └── ...
+│
+├── .agent/                     # repository-wide rules
+├── .github/workflows/          # CI
+├── acceptance/                 # one-shot acceptance artefacts
+└── Cargo.lock                  # committed (apps are binaries)
+```
+
+> **v0.3 → v0.4 migration:** the `runtime/` Python package,
+> `apps/runtime/` Python sidecar, and `crates/claude-adapter/`
+> are gone. There is no Python on the runtime path. See
+> [`docs/V03_DELETIONS.md`](./docs/V03_DELETIONS.md) (now
+> archived) for the removal record.
+
+---
+
+## 🔬 Test the runtime end-to-end
+
+```bash
+# Run all Rust tests (54 unit + 6 e2e).
+cargo test --workspace
+
+# Run the strict acceptance (separate Python harness):
+#   1. Start backend
+mkdir -p acceptance/ledger-task/backend
+cd acceptance/ledger-task/backend
+node server.js &
+#   2. Start frontend
+cd ../frontend
+python -m http.server 5501 &
+#   3. Run the harness
+python ../../backend_strict_test.py    # 28/28
+python ../../frontend_visual_test.py   # 6/6 scenarios with screenshots
+```
+
+Both harness scripts are committed alongside this README in the
+working acceptance directory. See [`docs/ACCEPTANCE_v0.4.md`](./docs/ACCEPTANCE_v0.4.md)
+for what they actually catch.
+
+---
+
+## 🧠 Roles
+
+| Chinese | English | What it does |
+|---------|---------|---------------|
+| 首席 | Chief | Receives the user's task, dispatches the team, reports back |
+| 军师 | Planner | Produces the Markdown plan, no code |
+| 工匠 | Worker | Writes code, edits files, runs commands |
+| 缺陷猎手 | BugHunter | Read-only; finds bugs, security holes, edge cases |
+| 质检师 | Reviewer | Read-mostly; checks naming, abstractions, tests |
+| 传令官 | Reporter | Final user-facing summary in plain Chinese |
+
+System prompts live in `crates/agent-core/src/prompt/mod.rs`.
+
+---
+
+## 📊 Roadmap
+
+| Milestone | Status |
+|-----------|--------|
+| v0.1 — Foundation (monorepo, CI, RFCs, Windows installer) | ✅ shipped |
+| v0.2 — Multi-provider maturity | ✅ shipped |
+| v0.3 — Embedded Rust agent + Chat Zone | ✅ shipped |
+| **v0.4 — Capabilities + repeat-failure abort + strict acceptance** | ✅ **shipped** |
+| v0.5 — Bash output streaming + multi-wf isolation + tree-kill | ⏳ in progress |
+| v0.6 — Memory + replay | 🎯 next |
+| v1.0 — Production | 🎯 target |
+
+The full milestone list with exit criteria is in
+[`docs/ROADMAP.md`](./docs/ROADMAP.md).
 
 ---
 
 ## 🤝 Contributing
 
-This project follows **RFC-driven development**:
+RFC-driven development. Non-trivial changes start as a
+document under `docs/`, get reviewed, then implemented.
 
-1. Open an issue describing the change.
-2. If the change is non-trivial, draft a new RFC under `docs/`.
-3. Discuss → revise → accept → implement.
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full contribution process.
+Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) and the
+repository-wide rules in [`.agent/`](./.agent/) before opening a
+PR. The CI is strict: clippy pedantic, rustfmt, eslint,
+prettier, and 60+ unit tests must all pass.
 
 ---
 
@@ -286,5 +277,4 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full contribution process.
 ---
 
 **Author:** Thatgfsj
-**Created:** 2026-06-18
-**Repo:** https://github.com/Thatgfsj/AgentCompanyOS
+**Repository:** https://github.com/Thatgfsj/AgentCompanyOS
