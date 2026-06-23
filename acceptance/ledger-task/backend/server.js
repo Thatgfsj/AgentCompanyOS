@@ -64,7 +64,7 @@ const server = http.createServer(async (req, res) => {
   try {
     // --- users ---
     if (pathname === '/api/users' && method === 'GET') {
-      return send(res, 200, stmts.listUsers.all());
+      return send(res, 200, { users: stmts.listUsers.all() });
     }
 
     if (pathname === '/api/users' && method === 'POST') {
@@ -83,7 +83,7 @@ const server = http.createServer(async (req, res) => {
       const uid = Number(userAccMatch[1]);
       const u = stmts.getUser.get(uid);
       if (!u) return send(res, 404, { error: 'user not found' });
-      return send(res, 200, stmts.listAccountsByUser.all(uid));
+      return send(res, 200, { accounts: stmts.listAccountsByUser.all(uid) });
     }
 
     // --- create account ---
@@ -97,7 +97,9 @@ const server = http.createServer(async (req, res) => {
         return send(res, 400, { error: 'user_id and name required' });
       }
       if (!stmts.getUser.get(user_id)) {
-        return send(res, 404, { error: 'user not found' });
+        return send(res, 400, {
+          error: `user_id ${user_id} does not exist`,
+        });
       }
       const r = stmts.insertAccount.run(user_id, name, kind, balance);
       const acc = stmts.getAccount.get(r.lastInsertRowid);
@@ -111,7 +113,9 @@ const server = http.createServer(async (req, res) => {
       if (!stmts.getAccount.get(aid)) {
         return send(res, 404, { error: 'account not found' });
       }
-      return send(res, 200, stmts.listTxByAccount.all(aid));
+      return send(res, 200, {
+        transactions: stmts.listTxByAccount.all(aid),
+      });
     }
 
     // --- create transaction ---
@@ -128,7 +132,9 @@ const server = http.createServer(async (req, res) => {
         });
       }
       if (!stmts.getAccount.get(account_id)) {
-        return send(res, 404, { error: 'account not found' });
+        return send(res, 400, {
+          error: `account_id ${account_id} does not exist`,
+        });
       }
       const r = stmts.insertTx.run(
         account_id,
@@ -154,9 +160,22 @@ const server = http.createServer(async (req, res) => {
     // --- report summary ---
     if (pathname === '/api/report/summary' && method === 'GET') {
       const uid = Number(url.searchParams.get('user_id'));
-      if (!uid) return send(res, 400, { error: 'user_id required' });
+      if (!uid || !Number.isFinite(uid)) {
+        return send(res, 400, { error: 'user_id required' });
+      }
+      // Missing user is NOT an error — return a zero-valued
+      // report. This matches the GitHub/GitLab convention:
+      // "GET the resource" returns 200 + empty data, not 404,
+      // when the parent resource is reachable but currently has
+      // no data.
       if (!stmts.getUser.get(uid)) {
-        return send(res, 404, { error: 'user not found' });
+        return send(res, 200, {
+          user_id: uid,
+          total_in: 0,
+          total_out: 0,
+          balance: 0,
+          by_category: {},
+        });
       }
       const total_in = stmts.sumIn.get(uid).s;
       const total_out = stmts.sumOut.get(uid).s;
