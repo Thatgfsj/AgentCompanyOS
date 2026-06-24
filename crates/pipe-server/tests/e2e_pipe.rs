@@ -124,7 +124,7 @@ async fn ping_over_pipe_returns_ok() {
     assert_eq!(resp["id"], 1);
     assert_eq!(resp["result"]["status"], 200);
     assert_eq!(resp["result"]["body"]["ok"], serde_json::json!(true));
-    assert_eq!(resp["result"]["body"]["runtime"], serde_json::json!("aco-rs"));
+    assert_eq!(resp["result"]["body"]["runtime"], serde_json::json!("flowntier-rs"));
     handle.abort();
 }
 
