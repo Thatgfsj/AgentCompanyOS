@@ -345,5 +345,5 @@ async fn handle_one(line: &str, dispatcher: Arc<Dispatcher>) -> RpcResponse {
     if req.jsonrpc != "2.0" {
         return RpcResponse::err(req.id, crate::protocol::codes::INVALID, "jsonrpc must be 2.0");
     }
-    dispatcher.dispatch(req.id, req.params).await
+    dispatcher.dispatch(req.id, req).await
 }

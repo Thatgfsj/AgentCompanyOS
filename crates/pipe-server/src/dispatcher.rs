@@ -13,23 +13,35 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::protocol::{codes, RpcParams, RpcResponse};
+use crate::protocol::{codes, RpcRequest, RpcResponse};
 
 /// A handler: takes the request body, returns `(status, body)`.
 pub type Handler = Arc<dyn Fn(Value) -> HandlerFuture + Send + Sync>;
 pub type HandlerFuture =
     std::pin::Pin<Box<dyn std::future::Future<Output = Result<(u16, Value), String>> + Send>>;
 
-/// A registry of RPC handlers keyed by method name.
+/// A registry of RPC handlers keyed by `(method, path)`.
 #[derive(Default, Clone)]
 pub struct Dispatcher {
-    handlers: HashMap<String, Handler>,
+    /// (HTTP method, path) -> handler. The pair is what HTTP itself
+    /// uses to identify a route; using it as the key here means a
+    /// GET and a PUT on the same path can coexist (e.g. `GET
+    /// /api/router/roles` reads the role list, `PUT /api/router/roles`
+    /// overwrites it).
+    handlers: HashMap<(String, String), Handler>,
 }
 
 impl std::fmt::Debug for Dispatcher {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Dispatcher")
-            .field("methods", &self.handlers.keys().collect::<Vec<_>>())
+            .field(
+                "routes",
+                &self
+                    .handlers
+                    .keys()
+                    .map(|(m, p)| format!("{m} {p}"))
+                    .collect::<Vec<_>>(),
+            )
             .finish()
     }
 }
@@ -40,29 +52,44 @@ impl Dispatcher {
         Self::default()
     }
 
-    /// Register a handler for `method`.
-    pub fn register<F>(&mut self, method: impl Into<String>, f: F)
+    /// Register a handler for `(method, path)`.
+    ///
+    /// `method` is the HTTP verb (`GET`, `POST`, `PUT`, `PATCH`,
+    /// `DELETE`, ...). The caller is responsible for keeping
+    /// `(method, path)` unique; registering the same pair twice
+    /// overwrites the previous handler, which is usually a bug
+    /// in the caller — see `register_all` for the canonical
+    /// endpoint list.
+    pub fn register<F>(&mut self, method: impl Into<String>, path: impl Into<String>, f: F)
     where
         F: Fn(Value) -> HandlerFuture + Send + Sync + 'static,
     {
-        self.handlers.insert(method.into(), Arc::new(f));
+        self.handlers
+            .insert((method.into().to_uppercase(), path.into()), Arc::new(f));
     }
 
-    /// List registered method names (sorted, deterministic).
+    /// List registered routes as `METHOD path` pairs, sorted
+    /// deterministically. Useful for diagnostics.
     pub fn methods(&self) -> Vec<String> {
-        let mut v: Vec<_> = self.handlers.keys().cloned().collect();
+        let mut v: Vec<String> = self
+            .handlers
+            .keys()
+            .map(|(m, p)| format!("{m} {p}"))
+            .collect();
         v.sort();
         v
     }
 
-    /// Dispatch an RPC request.
-    pub async fn dispatch(&self, req_id: u64, params: RpcParams) -> RpcResponse {
-        let body = params.body.unwrap_or(Value::Null);
-        let Some(handler) = self.handlers.get(&params.path) else {
+    /// Dispatch an RPC request. Looks up the handler by
+    /// `(req.method, req.params.path)`.
+    pub async fn dispatch(&self, req_id: u64, req: RpcRequest) -> RpcResponse {
+        let body = req.params.body.unwrap_or(Value::Null);
+        let key = (req.method.to_uppercase(), req.params.path);
+        let Some(handler) = self.handlers.get(&key) else {
             return RpcResponse::err(
                 req_id,
                 codes::NOT_FOUND,
-                format!("no handler registered for path {:?}", params.path),
+                format!("no handler registered for {} {}", key.0, key.1),
             );
         };
         match handler(body).await {
@@ -75,16 +102,24 @@ impl Dispatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::RpcParams;
+
+    fn req(method: &str, path: &str) -> RpcRequest {
+        RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: 1,
+            method: method.into(),
+            params: RpcParams { path: path.into(), body: None },
+        }
+    }
 
     #[tokio::test]
     async fn dispatches_known_method() {
         let mut d = Dispatcher::new();
-        d.register("/api/ping", |_body| {
+        d.register("GET", "/api/ping", |_body| {
             Box::pin(async { Ok((200, serde_json::json!({"pong": true}))) })
         });
-        let resp = d
-            .dispatch(1, RpcParams { path: "/api/ping".into(), body: None })
-            .await;
+        let resp = d.dispatch(1, req("GET", "/api/ping")).await;
         let r = resp.result.unwrap();
         assert_eq!(r.status, 200);
         assert_eq!(r.body["pong"], serde_json::json!(true));
@@ -93,10 +128,49 @@ mod tests {
     #[tokio::test]
     async fn unknown_method_is_not_found() {
         let d = Dispatcher::new();
-        let resp = d
-            .dispatch(2, RpcParams { path: "/nope".into(), body: None })
-            .await;
+        let resp = d.dispatch(2, req("GET", "/nope")).await;
         let e = resp.error.unwrap();
         assert_eq!(e.code, codes::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn get_and_put_on_same_path_coexist() {
+        // The v0.3 fix: previously the dispatcher only keyed on
+        // path, so a second register on the same path silently
+        // overwrote the first. With (method, path) as the key,
+        // GET and PUT handlers can both be registered.
+        let mut d = Dispatcher::new();
+        d.register("GET", "/api/router/roles", |_body| {
+            Box::pin(async {
+                Ok((
+                    200,
+                    serde_json::json!({"op": "list", "roles": []}),
+                ))
+            })
+        });
+        d.register("PUT", "/api/router/roles", |_body| {
+            Box::pin(async {
+                Ok((
+                    200,
+                    serde_json::json!({"op": "update", "ok": true}),
+                ))
+            })
+        });
+        let list = d.dispatch(1, req("GET", "/api/router/roles")).await;
+        let upd = d.dispatch(2, req("PUT", "/api/router/roles")).await;
+        assert_eq!(list.result.unwrap().body["op"], "list");
+        assert_eq!(upd.result.unwrap().body["op"], "update");
+    }
+
+    #[tokio::test]
+    async fn method_is_case_insensitive() {
+        let mut d = Dispatcher::new();
+        d.register("get", "/api/ping", |_body| {
+            Box::pin(async { Ok((200, serde_json::json!({"ok": true}))) })
+        });
+        // Lowercase 'get' is normalized to GET on register;
+        // dispatch with uppercase GET should still find it.
+        let resp = d.dispatch(1, req("GET", "/api/ping")).await;
+        assert_eq!(resp.result.unwrap().status, 200);
     }
 }

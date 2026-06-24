@@ -115,7 +115,7 @@ async fn ping_over_pipe_returns_ok() {
         serde_json::json!({
             "jsonrpc": "2.0",
             "id": 1,
-            "method": "/api/ping",
+            "method": "GET",
             "params": {"path": "/api/ping", "body": null}
         }),
     )
@@ -136,7 +136,7 @@ async fn unknown_method_returns_jsonrpc_error() {
         serde_json::json!({
             "jsonrpc": "2.0",
             "id": 9,
-            "method": "/nope",
+            "method": "GET",
             "params": {"path": "/nope", "body": null}
         }),
     )
@@ -153,7 +153,7 @@ async fn providers_endpoint_returns_ok() {
         serde_json::json!({
             "jsonrpc": "2.0",
             "id": 2,
-            "method": "/api/providers",
+            "method": "GET",
             "params": {"path": "/api/providers", "body": null}
         }),
     )
