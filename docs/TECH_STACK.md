@@ -90,7 +90,7 @@ on Linux. No bundled Chromium.
 | **Zod** | Runtime validation of Tauri IPC payloads |
 | **Monaco Editor** | Read-only diff / source view in IDE page |
 | **xterm.js** | Bottom console (bash tool output) |
-| **React Flow** | Task graph visualization (首席's plan) |
+| **React Flow** | Task graph visualization (主理's plan) |
 | **Live2D Cubism** | Avatars — v0.5 only |
 
 **State boundary:**
@@ -172,7 +172,7 @@ Built **in-house** in Rust on top of `tokio`:
 * **Event Bus integration** — pub/sub via `event-bus` so every
   step streams to the UI in real time.
 * **Task Graph Scheduler** — dispatches per-task envelopes from
-  the 首席's plan.
+  the 主理's plan.
 * **Prompt Engine** — renders prompt templates with task payload
   + role-specific system prompt.
 * **Model Router** — see [PROVIDER_SPEC.md](./PROVIDER_SPEC.md).
@@ -330,7 +330,7 @@ trait. No external plugin loading yet — that's v0.4.
 | Tool | Use |
 |------|-----|
 | **Mermaid** | Plan doc as a graph (legacy) |
-| **React Flow** | Interactive task graph (首席's plan) |
+| **React Flow** | Interactive task graph (主理's plan) |
 | **Monaco** | Source / diff viewer in IDE page |
 | **Motion** | Phase transitions, status pulses |
 | **Live2D** | Avatars (v0.5) |

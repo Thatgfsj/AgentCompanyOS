@@ -80,7 +80,7 @@ const TASKS: SimTask[] = [
   {
     id: 't1',
     title: '后端：实现 /login 接口',
-    owner: '执行员 1',
+    owner: '实施 1',
     fileHint: 'src/auth/login.py',
     durationMs: 1600,
     passesFirstTry: true,
@@ -88,7 +88,7 @@ const TASKS: SimTask[] = [
   {
     id: 't2',
     title: '前端：LoginForm 组件',
-    owner: '执行员 2',
+    owner: '实施 2',
     fileHint: 'src/components/LoginForm.tsx',
     durationMs: 1400,
     passesFirstTry: true,
@@ -96,7 +96,7 @@ const TASKS: SimTask[] = [
   {
     id: 't3',
     title: '数据库：users 表迁移',
-    owner: '执行员 3',
+    owner: '实施 3',
     fileHint: 'migrations/0001_users.sql',
     durationMs: 1200,
     passesFirstTry: false, // will be repaired
@@ -104,7 +104,7 @@ const TASKS: SimTask[] = [
   {
     id: 't4',
     title: '测试：登录流程端到端',
-    owner: '执行员 4',
+    owner: '实施 4',
     fileHint: 'tests/e2e/test_login.py',
     durationMs: 1000,
     passesFirstTry: true,
@@ -203,7 +203,7 @@ export function startSimulation(
   // ── Phase 4: Dispatch + 5: Development ───────────────────────
   cancels.push(
     delay(5200, speed, () => {
-      log('agent:chief', '派发任务给 4 个执行员');
+      log('agent:chief', '派发任务给 4 个实施');
       for (const t of TASKS) task(t.id, 'DISPATCHED');
     }),
   );

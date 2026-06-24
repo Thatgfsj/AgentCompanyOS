@@ -350,7 +350,7 @@ export function App() {
 
           <AgentCard
             role="chief"
-            name="首席代理"
+            name="主理"
             status={agentStatusToRole(agentStatus.chief)}
             subtitle={
               agentStatus.chief === 'thinking'
@@ -363,7 +363,7 @@ export function App() {
           />
 
           <ReasoningBubble
-            agentName="首席代理"
+            agentName="主理"
             roleColorClass="border-t-chief"
             step={`阶段 ${activePhase + 1} / 8`}
             body={

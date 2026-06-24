@@ -1,7 +1,7 @@
 # Coding Rules
 
 > Rules every contributor (human or AI) must follow when writing
-> code for Agent Company OS.
+> code for Flowntier.
 
 **Version:** v0.1
 **Enforced by:** CI (lint, format, type-check, test)

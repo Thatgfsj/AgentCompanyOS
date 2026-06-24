@@ -8,7 +8,7 @@
  *
  * Progressive: reuses the existing zone chrome, no IDE rewrite.
  * Visible affordances:
- *   - role picker (首席 / 工匠 / 缺陷猎手 / 质检师 / 军师 / 传令官)
+ *   - role picker (主理 / 实施 / 找茬 / 审查 / 计划 / 汇报)
  *   - provider picker (OpenAI / Anthropic-compatible / 自定义)
  *   - multiline input
  *   - send button (also Ctrl/Cmd+Enter)
@@ -27,12 +27,12 @@ interface RoleSpec {
 }
 
 const ROLES: RoleSpec[] = [
-  { id: 'agent:chief',    label: '首席',   hint: '拆任务、调度、汇总' },
-  { id: 'agent:worker',   label: '工匠',   hint: '写代码、改文件、跑命令' },
-  { id: 'agent:critic:a', label: '缺陷猎手', hint: '挖 bug、安全、边界' },
-  { id: 'agent:critic:b', label: '质检师', hint: '命名、抽象、文档' },
-  { id: 'agent:planner',  label: '军师',   hint: '方案、接口、验收' },
-  { id: 'agent:reporter', label: '传令官', hint: '给用户写最终总结' },
+  { id: 'agent:chief',    label: '主理',   hint: '拆任务、调度、汇总' },
+  { id: 'agent:worker',   label: '实施',   hint: '写代码、改文件、跑命令' },
+  { id: 'agent:critic:a', label: '找茬',   hint: '挖 bug、安全、边界' },
+  { id: 'agent:critic:b', label: '审查',   hint: '命名、抽象、文档' },
+  { id: 'agent:planner',  label: '计划',   hint: '方案、接口、验收' },
+  { id: 'agent:reporter', label: '汇报',   hint: '给用户写最终总结' },
 ];
 
 interface ProviderSpec {

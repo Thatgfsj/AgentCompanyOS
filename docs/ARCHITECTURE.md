@@ -150,7 +150,7 @@ crates/agent-core/src/
 │                              the adapter following the protocol in
 │                              `crates/agent-core/src/provider/anthropic.rs`.
 ├── prompt/
-│   ├── system.rs       system prompts per role (首席 / 缺陷猎手 / 工匠 / ...)
+│   ├── system.rs       system prompts per role (主理 / 找茬 / 实施 / ...)
 │   └── template.rs     placeholder substitution + context injection
 └── tests/              unit tests per module + e2e mock provider tests
 ```
@@ -307,8 +307,8 @@ User           UI          agent-core       Provider       SQLite
 
 ## 8. Concurrency Model
 
-* **One workflow = one 首席.** 工匠 / 缺陷猎手 / 质检师 are async
-  tasks spawned by the 首席, not threads.
+* **One workflow = one 主理.** 实施 / 找茬 / 审查 are async
+  tasks spawned by the 主理, not threads.
 * **Tauri webview** runs on the main thread; React state updates go
   through TanStack Query → event-bus → Tauri IPC.
 * **agent-core** uses tokio multi-thread. Each provider call is a
@@ -324,7 +324,7 @@ User           UI          agent-core       Provider       SQLite
 | Failure | Boundary that catches it | Recovery |
 |---------|--------------------------|----------|
 | Model API timeout | `agent-core/providers/*` | Router failover |
-| 工匠 crash mid-task | 首席 via heartbeat timeout | REPAIR or ABORT |
+| 实施 crash mid-task | 主理 via heartbeat timeout | REPAIR or ABORT |
 | Provider 5xx / 429 | `agent-core/providers/*` | Backoff + retry, then failover |
 | SQLite corruption | `storage` integrity check | Backup restore |
 | Tauri webview crash | Tauri main process | Auto-reload webview |

@@ -1,6 +1,6 @@
 # Commit Rules
 
-> Rules for writing git commits in Agent Company OS.
+> Rules for writing git commits in Flowntier.
 
 **Version:** v0.1
 **Enforced by:** `commitlint` (CI)

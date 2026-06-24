@@ -9,7 +9,7 @@ await page.waitForSelector('ol[aria-label="工作流时间线"]', { timeout: 200
 await page.waitForTimeout(800);
 
 console.log('Typing request and clicking 发送...');
-const input = page.getByLabel('向首席代理输入指令');
+const input = page.getByLabel('向主理输入指令');
 await input.fill('实现 POST /auth/login 接口');
 await page.getByRole('button', { name: '发送' }).click();
 

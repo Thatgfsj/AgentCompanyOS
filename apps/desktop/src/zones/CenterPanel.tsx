@@ -14,7 +14,7 @@ export function CenterPanel({ chiefCard }: CenterPanelProps) {
       {chiefCard}
 
       <ReasoningBubble
-        agentName="首席代理"
+        agentName="主理"
         roleColorClass="border-t-chief"
         step="规划中 — 草拟 API 设计"
         body="正在草拟 4 个任务的计划：后端 /login 接口、前端 LoginForm、数据库 users 表、单元测试。预计输入 9k tokens，输出 4k。"

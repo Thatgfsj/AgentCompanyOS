@@ -1,5 +1,5 @@
 {
-  "name": "@aco/ui",
+  "name": "@flowntier/ui",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -21,7 +21,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@aco/shared": "workspace:*",
+    "@flowntier/shared": "workspace:*",
     "@radix-ui/react-slot": "^1.1.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",

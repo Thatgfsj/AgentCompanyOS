@@ -35,7 +35,7 @@ export function CommandDock({
       className="flex shrink-0 items-center gap-2 border-t border-border bg-surface-2 px-4 py-3"
       aria-label="命令输入栏"
     >
-      <span className="shrink-0 font-mono text-xs text-text-secondary">首席 ▸</span>
+      <span className="shrink-0 font-mono text-xs text-text-secondary">主理 ▸</span>
       <input
         type="text"
         value={commandInput}
@@ -43,11 +43,11 @@ export function CommandDock({
         placeholder={
           isReset
             ? '输入新指令以开始新工作流'
-            : '向首席代理下达指令…  例如：实现 POST /auth/login 接口'
+            : '向主理下达指令…  例如：实现 POST /auth/login 接口'
         }
         disabled={busy}
         className="flex-1 rounded-md border border-border bg-surface-1 px-3 py-2 text-sm placeholder:text-text-secondary focus:border-chief focus:outline-none focus:ring-2 focus:ring-chief/50 disabled:opacity-50"
-        aria-label="向首席代理输入指令"
+        aria-label="向主理输入指令"
       />
       <button
         type="submit"

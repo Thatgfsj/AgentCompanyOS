@@ -68,7 +68,7 @@ logs/
 *.seed
 *.pid.lock
 
-# ─── Local Storage (ACO specific) ────────────────────
+# ─── Local Storage (Flowntier specific) ────────────────
 .storage/
 storage/local/
 storage/cache/

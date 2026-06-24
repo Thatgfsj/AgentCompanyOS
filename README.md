@@ -19,11 +19,11 @@ collaborate behind the scenes — exactly like a real software
 company:
 
 ```
-User → 首席 (Chief) → 军师 (Planner) → 工匠 (Worker) × N
+需求  →  主理 (Chief)  →  计划 (Planner)  →  实施 (Worker) × N
                                               ↓
-                  ← 缺陷猎手 (BugHunter) / 质检师 (Reviewer)
+                 评审  ←  审查 (Reviewer) / 找茬 (BugHunter)
                                               ↓
-                  ← 传令官 (Reporter) → User
+                 交付  ←  汇报 (Reporter)  →  需求方
 ```
 
 The IDE is only the visualization layer. **The workflow is the
@@ -228,14 +228,14 @@ for what they actually catch.
 
 ## 🧠 Roles
 
-| Chinese | English | What it does |
-|---------|---------|---------------|
-| 首席 | Chief | Receives the user's task, dispatches the team, reports back |
-| 军师 | Planner | Produces the Markdown plan, no code |
-| 工匠 | Worker | Writes code, edits files, runs commands |
-| 缺陷猎手 | BugHunter | Read-only; finds bugs, security holes, edge cases |
-| 质检师 | Reviewer | Read-mostly; checks naming, abstractions, tests |
-| 传令官 | Reporter | Final user-facing summary in plain Chinese |
+| 中文 | English | 职责 |
+|---------|---------|------|
+| 主理 | Chief | 接收需求、调度团队、最终交付 |
+| 计划 | Planner | 产出 Markdown 方案,不写代码 |
+| 实施 | Worker | 写代码、改文件、跑命令 |
+| 找茬 | BugHunter | 只读;找 Bug、安全漏洞、边界情况 |
+| 审查 | Reviewer | 几乎只读;检查命名、抽象、测试 |
+| 汇报 | Reporter | 用大白话给需求方做最终总结 |
 
 System prompts live in `crates/agent-core/src/prompt/mod.rs`.
 

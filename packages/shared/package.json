@@ -1,9 +1,9 @@
 {
-  "name": "@aco/shared",
+  "name": "@flowntier/shared",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Cross-language types for ACO (events, errors, IPC messages). Source of truth for Rust + Python codegen.",
+  "description": "Cross-language types for Flowntier (events, errors, IPC messages). Source of truth for Rust + TypeScript codegen.",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {

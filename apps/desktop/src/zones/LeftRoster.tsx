@@ -19,11 +19,11 @@ export function LeftRoster({
   return (
     <div className="flex flex-col gap-2">
       <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-        首席
+        主理
       </h2>
       <AgentCard
         role="chief"
-        name="首席代理"
+        name="主理代理"
         status={chiefStatus}
         subtitle="沉稳的策略师 · 正在分析"
         progress={chiefStatus === 'thinking' ? 0.5 : undefined}
@@ -36,7 +36,7 @@ export function LeftRoster({
         role="critic-a"
         name="审核员 A"
         status={criticAStatus}
-        subtitle="缺陷猎手"
+        subtitle="找茬"
       />
       <AgentCard
         role="critic-b"
@@ -46,11 +46,11 @@ export function LeftRoster({
       />
 
       <h2 className="mt-3 px-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-        执行员
+        实施
       </h2>
       <AgentCard
         role="worker"
-        name="执行员"
+        name="实施"
         status={workerStatus}
         subtitle="执行任务中"
       />

@@ -1,7 +1,7 @@
 # Architecture Rules
 
 > Rules for how modules, crates, and packages may depend on each
-> other in Agent Company OS.
+> other in Flowntier.
 
 **Version:** v0.1
 **Enforced by:** `cargo metadata` cycle check, ESLint `no-restricted-imports`,

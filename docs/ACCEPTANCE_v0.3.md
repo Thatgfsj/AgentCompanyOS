@@ -196,8 +196,8 @@ event type ('message')`
 expected streaming text from MiniMax:
 
 ```
-[工匠] 根据
-[工匠] 你提供的上下文，今天应该专注于完成带"目标 / 接口 / 验收"的子任务。
+[实施] 根据
+[实施] 你提供的上下文，今天应该专注于完成带"目标 / 接口 / 验收"的子任务。
 → status: DONE
 === full transcript (101 chars, 0 tool calls) ===
 根据你提供的上下文，今天应该专注于完成带"目标 / 接口 / 验收"的子任务。

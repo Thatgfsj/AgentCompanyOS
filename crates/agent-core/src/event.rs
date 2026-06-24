@@ -17,7 +17,7 @@ pub enum AgentEvent {
     TextDelta {
         /// Logical role id (e.g. `agent:chief`).
         agent_id: String,
-        /// Display role name (e.g. `首席`, `工匠`).
+        /// Display role name (e.g. `主理`, `实施`).
         agent_display: String,
         /// Fragment of text.
         delta: String,

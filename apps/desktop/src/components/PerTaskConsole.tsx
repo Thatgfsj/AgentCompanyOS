@@ -35,10 +35,10 @@ function shortTime(iso: string): string {
 }
 
 function agentToLabel(agentId: string): string {
-  if (agentId === 'agent:chief') return '首席';
+  if (agentId === 'agent:chief') return '主理';
   if (agentId === 'agent:critic:a') return '审核A';
   if (agentId === 'agent:critic:b') return '审核B';
-  if (agentId.startsWith('agent:worker:')) return '执行员';
+  if (agentId.startsWith('agent:worker:')) return '实施';
   if (agentId === 'agent:system') return '系统';
   return agentId;
 }

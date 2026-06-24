@@ -26,13 +26,13 @@ agents in ACO use to talk to each other. The contract must:
 
 | 中文名 | 协议名 | Talks to | Talks with |
 |--------|--------|----------|------------|
-| **首席** (Chief) | `agent:chief` | 缺陷猎手 / 质检师 / 工匠 / 军师 / 传令官 / User | All |
-| **缺陷猎手** (Critic A) | `agent:critic:a` | 首席 | 首席 only |
-| **质检师** (Critic B) | `agent:critic:b` | 首席 | 首席 only |
-| **军师** (Planner) | `agent:planner` | 首席 | 首席 only |
-| **工匠** (Worker) | `agent:worker:<task-slug>` | 首席 | 首席 only |
-| **传令官** (Reporter) | `agent:reporter` | 首席 | 首席 only |
-| **User** | `agent:user` | 首席 | 首席 only |
+| **主理** (Chief) | `agent:chief` | 找茬 / 审查 / 实施 / 计划 / 汇报 / User | All |
+| **找茬** (Critic A) | `agent:critic:a` | 主理 | 主理 only |
+| **审查** (Critic B) | `agent:critic:b` | 主理 | 主理 only |
+| **计划** (Planner) | `agent:planner` | 主理 | 主理 only |
+| **实施** (Worker) | `agent:worker:<task-slug>` | 主理 | 主理 only |
+| **汇报** (Reporter) | `agent:reporter` | 主理 | 主理 only |
+| **User** | `agent:user` | 主理 | 主理 only |
 
 **Rule:** Only the Chief is a hub. All other agents are **leaves**.
 
@@ -403,7 +403,7 @@ follows:
 |------------------|---------------------|
 | Envelope (the JSON above) | `crates/agent-core/src/protocol.rs::Envelope` (Rust serde) |
 | Transport | In-process `tokio::mpsc` between role handlers in `crates/agent-core/src/loop.rs` |
-| Agent IDs | `首席::id() = "agent:chief"`, etc., derived from role |
+| Agent IDs | `主理::id() = "agent:chief"`, etc., derived from role |
 | Persistence | Each envelope appended to `storage/workflows/<wf_id>.jsonl` |
 | UI surface | Streamed to webview via `crates/event-bus` → Tauri `wf:event` |
 
@@ -430,7 +430,7 @@ location changed.
 2. Should `USER_QUERY` have a default option (timeout → pick first option)? (proposed: yes, with a "no default — abort" override)
 3. Should we sign messages (HMAC) for tamper detection? (proposed: not in v0.3)
 4. v0.3 deprecates the English role names (`Chief`, `Critic`, …) in
-   favor of 中文 (`首席`, `缺陷猎手`, …). Should we keep the protocol
+   favor of 中文 (`主理`, `找茬`, …). Should we keep the protocol
    field `from: "agent:chief"` for backward compat, or change to
    `from: "agent:shouxi"`? (proposed: keep `agent:chief` for wire
    compat; map to 中文 only in UI)

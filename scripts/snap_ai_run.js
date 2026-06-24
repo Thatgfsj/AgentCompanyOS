@@ -19,7 +19,7 @@ console.log('1) initial screenshot');
 await page.screenshot({ path: '.validation/ui-1-initial.png', fullPage: true });
 
 console.log('Clicking 发送...');
-const input = page.getByLabel('向首席代理输入指令');
+const input = page.getByLabel('向主理输入指令');
 await input.fill('实现一个计算斐波那契数列第 n 项的 Python 函数，附带单元测试');
 await page.getByRole('button', { name: '发送' }).click();
 

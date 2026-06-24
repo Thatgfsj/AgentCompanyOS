@@ -1,4 +1,4 @@
-"""ACO end-to-end smoke test.
+"""Flowntier end-to-end smoke test.
 
 Submits a workflow via POST /api/workflow, polls /plan + /api/workflow
 until terminal state, prints a compact result table. Designed to be

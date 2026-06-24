@@ -147,7 +147,7 @@ interface RuntimeSnapshot {
 const EMPTY: RuntimeSnapshot = { providers: [], roles: [], available_models: [] };
 
 const ROLE_LABELS: Record<string, string> = {
-  chief: '首席代理', critic_a: '审核员 A', critic_b: '审核员 B', worker: '执行员', reporter: '汇报员',
+  chief: '主理', critic_a: '审核员 A', critic_b: '审核员 B', worker: '实施', reporter: '汇报',
 };
 
 export interface SettingsProps {

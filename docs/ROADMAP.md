@@ -12,7 +12,7 @@
 ## 1. Vision (one paragraph)
 
 ACO becomes the **operating system for an AI software company** — a
-visual workspace where specialized AI agents collaborate under a 首席
+visual workspace where specialized AI agents collaborate under a 主理
 to ship production software, while humans stay in control of intent and
 final approval. The IDE is the surface; the workflow is the product.
 
@@ -55,12 +55,12 @@ major.
 
 | 旧名 | 新名 | 职责 |
 |------|------|------|
-| Chief | **首席** | 拆任务、调度、统筹 |
-| Planner | **军师** | 出方案、对比、选型 |
-| Reviewer | **质检师** | 看代码、挑刺、写 review |
-| Critic | **缺陷猎手** | 挖 bug、安全漏洞、边界情况 |
-| Worker | **工匠** | 写代码、修文件、跑命令 |
-| Reporter | **传令官** | 给用户写最终摘要 |
+| Chief | **主理** | 拆任务、调度、统筹 |
+| Planner | **计划** | 出方案、对比、选型 |
+| Reviewer | **审查** | 看代码、挑刺、写 review |
+| Critic | **找茬** | 挖 bug、安全漏洞、边界情况 |
+| Worker | **实施** | 写代码、修文件、跑命令 |
+| Reporter | **汇报** | 给用户写最终摘要 |
 
 ---
 
@@ -105,8 +105,8 @@ plugin UI panels.
   all arrive live; user sees activity in < 200 ms after prompt
   *(verified end-to-end with MiniMax-M3, see
   `docs/ACCEPTANCE_v0.3.md` §7)*
-- [x] **Roles relabeled to 中文** — 首席 / 缺陷猎手 / 工匠 / 质检师
-  / 军师 / 传令官 *(implemented in `crates/agent-core/src/prompt/` + UI strings in `ChatZone.tsx`)*
+- [x] **Roles relabeled to 中文** — 主理 / 找茬 / 实施 / 审查
+  / 计划 / 汇报 *(implemented in `crates/agent-core/src/prompt/` + UI strings in `ChatZone.tsx`)*
 - [x] **Provider presets trimmed** — drop MiniMax/DeepSeek from
   built-in presets; MiniMax-Text-01 specifically (it does not
   support tool_calls). Users can still add them as custom relays
@@ -204,7 +204,7 @@ shim if backwards compatibility matters.
 - [ ] Project memory (persistent facts across workflows)
 - [ ] Workflow replay (JSONL + model versions → bit-exact rerun)
 - [ ] Plan doc rendered as an editable graph
-- [ ] Multi-workflow parallelism with separate 首席 instances
+- [ ] Multi-workflow parallelism with separate 主理 instances
 - [ ] Provider reliability learning (router downranks bad providers)
 - [ ] WASM plugins
 - [ ] i18n (UI + prompts fully bilingual)
@@ -213,7 +213,7 @@ shim if backwards compatibility matters.
 
 > **Title:** ACO has a face.
 
-- [ ] Live2D avatars for 首席 / 缺陷猎手 / 工匠 / 质检师
+- [ ] Live2D avatars for 主理 / 找茬 / 实施 / 审查
 - [ ] Streaming "thinking" bullets visible mid-response
 - [ ] Voice input (Whisper) and output (TTS) — user-optional
 
@@ -247,7 +247,7 @@ shim if backwards compatibility matters.
 | Time from "I have an idea" to "running code"        | < 2 min       |
 | Latency: prompt → first text delta on screen        | < 200 ms      |
 | Number of human interventions per 10-task workflow  | < 3            |
-| % of workflows that pass 缺陷猎手 review on 1st try | > 70%         |
+| % of workflows that pass 找茬 review on 1st try | > 70%         |
 | Token cost per 10-task workflow (median)            | < $5 USD       |
 | Workflows replayable bit-exact                      | 100%          |
 

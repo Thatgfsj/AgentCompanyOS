@@ -1,4 +1,4 @@
-"""Generate ACO Tauri app icons via MiniMax image-01 API.
+"""Generate Flowntier Tauri app icons via MiniMax image-01 API.
 
 Outputs:
   apps/desktop/src-tauri/icons/icon-1024.png  (Tauri primary)
@@ -24,7 +24,7 @@ ICON_DIR.mkdir(parents=True, exist_ok=True)
 # Three prompts with ascending detail so we get clean, on-brand results.
 PROMPTS = [
     # 1024 — primary
-    """Minimal geometric app icon for Agent Company OS (ACO), a dark-themed \
+    """Minimal geometric app icon for Flowntier, a dark-themed \
 AI software-company dashboard. Center: a stylized letter 'A' formed by two \
 overlapping triangles — one cyan #06b6d4, one violet #8b5cf6 — that together \
 suggest a folder/eye/lens (the observer watching the workers). Background: \

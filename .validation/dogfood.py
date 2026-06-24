@@ -1,4 +1,4 @@
-"""Dogfooding harness — submit a real workflow task to ACO, poll
+"""Dogfooding harness — submit a real workflow task to Flowntier, poll
 until done, dump everything (plan, events, task statuses,
 summary, runtime log slice) into a per-wf folder.
 
@@ -38,7 +38,7 @@ def http_get(path: str, timeout: int = 30) -> dict | list:
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("request", help="user request for ACO")
+    p.add_argument("request", help="user request for Flowntier")
     p.add_argument("--timeout", type=int, default=600)
     p.add_argument("--out", default=".validation/dogfooding")
     args = p.parse_args()
