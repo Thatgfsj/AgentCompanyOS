@@ -1,4 +1,4 @@
-# Agent Company OS (ACO)
+# Flowntier
 
 > **A Visual AI Software Company Powered by Multi-Agent Workflow**
 >
@@ -11,7 +11,7 @@
 > **Author:** Thatgfsj
 > **License:** MIT
 
-ACO is not another AI IDE. It is an **AI Software Company
+Flowntier is not another AI IDE. It is an **AI Software Company
 Operating System**.
 
 Users interact with a visual workspace while multiple AI agents
@@ -70,9 +70,9 @@ Download the installer for the latest release from
 
 | Artifact | When to use | Size |
 |----------|-------------|------|
-| `Agent Company OS_0.2.5_x64-setup.exe` (NSIS) | Public distribution | ~30 MB |
-| `Agent Company OS_0.2.5_x64_en-US.msi` (MSI) | Corporate / Group Policy | ~40 MB |
-| `aco-desktop.exe` (standalone) | Dev / portable | ~16 MB |
+| `Flowntier_0.2.5_x64-setup.exe` (NSIS) | Public distribution | ~30 MB |
+| `Flowntier_0.2.5_x64_en-US.msi` (MSI) | Corporate / Group Policy | ~40 MB |
+| `flowntier-desktop.exe` (standalone) | Dev / portable | ~16 MB |
 
 SmartScreen shows "Unknown publisher" because the build is
 unsigned. Click **More info → Run anyway**. Code-signing
@@ -94,13 +94,13 @@ cd Flowntier
 
 pnpm install
 
-# Build the Rust sidecar first (aco-runtime + agent-core + pipe-server).
+# Build the Rust sidecar first (flowntier-runtime + agent-core + pipe-server).
 cargo build --release -p pipe-server
 
 # Stage the sidecar binary where the Tauri bundler expects it.
 mkdir -p apps/desktop/src-tauri/binaries
-cp target/release/aco-runtime.exe \
-   apps/desktop/src-tauri/binaries/aco_runtime-x86_64-pc-windows-msvc.exe
+cp target/release/flowntier-runtime.exe \
+   apps/desktop/src-tauri/binaries/flowntier_runtime-x86_64-pc-windows-msvc.exe
 
 # Build the installer.
 cd apps/desktop
@@ -129,9 +129,9 @@ pnpm tauri:dev
 └─────────────────────────┬────────────────────────────────────────┘
                           │ tauri::command
 ┌─────────────────────────┴────────────────────────────────────────┐
-│                aco-runtime (Rust, single process)                │
+│                flowntier-runtime (Rust, single process)                │
 │                                                                  │
-│   crates/pipe-server    JSON-RPC over \\.\pipe\aco_runtime       │
+│   crates/pipe-server    JSON-RPC over \\.\pipe\flowntier_runtime       │
 │     ↓                                                            │
 │   crates/agent-core     in-process agent loop + tool registry    │
 │     ↓                  + provider clients (SSE)                   │
@@ -164,7 +164,7 @@ Flowntier/
 │   ├── pipe-server/            # ⭐ JSON-RPC + event-push over named pipe
 │   ├── event-bus/              # Rust pub/sub
 │   ├── tauri-core/             # Tauri app glue
-│   ├── config/                 # aco.toml loader
+│   ├── config/                 # flowntier.toml loader
 │   └── storage/                # SQLx repositories
 │
 ├── packages/                   # pnpm workspace (TS shared)
