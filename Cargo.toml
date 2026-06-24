@@ -16,7 +16,7 @@ edition     = "2021"
 rust-version = "1.85"
 license     = "MIT"
 authors     = ["Thatgfsj <thatgfsj@gmail.com>"]
-repository  = "https://github.com/Thatgfsj/AgentCompanyOS"
+repository  = "https://github.com/Thatgfsj/Flowntier"
 
 [workspace.dependencies]
 # Async

@@ -64,8 +64,8 @@ React, and Vue. The lifecycle:
 
 ```bash
 # Clone
-git clone https://github.com/Thatgfsj/AgentCompanyOS.git
-cd AgentCompanyOS
+git clone https://github.com/Thatgfsj/Flowntier.git
+cd Flowntier
 
 # Install everything
 pnpm install            # TypeScript

@@ -462,8 +462,8 @@ The entire acceptance exercise is reproducible from a clean
 checkout:
 
 ```bash
-git clone https://github.com/Thatgfsj/AgentCompanyOS
-cd AgentCompanyOS
+git clone https://github.com/Thatgfsj/Flowntier
+cd Flowntier
 export MINIMAX_API_KEY=sk-cp-...
 # (Optional) export MINIMAX_BASE_URL=https://api.minimaxi.com/v1
 

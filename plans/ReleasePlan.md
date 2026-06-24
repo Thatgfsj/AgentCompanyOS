@@ -36,9 +36,9 @@ Each release produces:
 
 | Artifact            | Path                                |
 |---------------------|--------------------------------------|
-| Windows MSI         | `dist/AgentCompanyOS-Setup-x.y.z.msi` |
-| Windows NSIS        | `dist/AgentCompanyOS-x.y.z.exe`     |
-| macOS DMG           | `dist/AgentCompanyOS-x.y.z.dmg`     |
+| Windows MSI         | `dist/Flowntier-Setup-x.y.z.msi` |
+| Windows NSIS        | `dist/Flowntier-x.y.z.exe`     |
+| macOS DMG           | `dist/Flowntier-x.y.z.dmg`     |
 | Linux .deb          | `dist/aco_x.y.z_amd64.deb`           |
 | Linux .rpm          | `dist/aco-x.y.z.x86_64.rpm`          |
 | Linux AppImage      | `dist/aco-x.y.z.AppImage`            |

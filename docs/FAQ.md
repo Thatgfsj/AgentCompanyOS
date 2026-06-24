@@ -228,7 +228,7 @@ audit + freeze). See [ROADMAP.md](./ROADMAP.md).
 ### Will ACO be open source?
 
 The plan is **yes**, MIT-licensed. The repo is public at
-`https://github.com/Thatgfsj/AgentCompanyOS`.
+`https://github.com/Thatgfsj/Flowntier`.
 
 ### Will there be a cloud version?
 

@@ -31,7 +31,7 @@ a database. A curated plugin marketplace ships.
    * In-app browser
    * One-click install
    * `gh`-style CLI: `aco plugin install <name>`
-   * Plugin submission via PR to `Thatgfsj/AgentCompanyOS-plugins`
+   * Plugin submission via PR to `Thatgfsj/Flowntier-plugins`
    * Manual review for: `unrestricted = true`, network wildcards,
      env access, spawn wildcards
 

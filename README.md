@@ -66,7 +66,7 @@ product.**
 ## 🚀 Install (Windows)
 
 Download the installer for the latest release from
-[Releases](https://github.com/Thatgfsj/AgentCompanyOS/releases).
+[Releases](https://github.com/Thatgfsj/Flowntier/releases).
 
 | Artifact | When to use | Size |
 |----------|-------------|------|
@@ -89,8 +89,8 @@ Prerequisites: Rust ≥ 1.85, Node ≥ 24, pnpm ≥ 9, Tauri CLI,
 WiX (Windows only, automatic).
 
 ```bash
-git clone https://github.com/Thatgfsj/AgentCompanyOS.git
-cd AgentCompanyOS
+git clone https://github.com/Thatgfsj/Flowntier.git
+cd Flowntier
 
 pnpm install
 
@@ -155,7 +155,7 @@ module-boundary spec and data-flow diagrams.
 ## 🗂️ Repository layout
 
 ```
-AgentCompanyOS/
+Flowntier/
 ├── apps/
 │   └── desktop/                # Tauri v2 app (React + Rust sidecar)
 │
@@ -277,4 +277,4 @@ prettier, and 60+ unit tests must all pass.
 ---
 
 **Author:** Thatgfsj
-**Repository:** https://github.com/Thatgfsj/AgentCompanyOS
+**Repository:** https://github.com/Thatgfsj/Flowntier
