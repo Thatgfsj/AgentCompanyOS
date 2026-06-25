@@ -8,19 +8,19 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@aco/prompts':
+      '@flowntier/prompts':
         specifier: workspace:*
         version: link:../../packages/prompts
-      '@aco/providers':
+      '@flowntier/providers':
         specifier: workspace:*
         version: link:../../packages/providers
-      '@aco/shared':
+      '@flowntier/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@aco/ui':
+      '@flowntier/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@aco/workflow':
+      '@flowntier/workflow':
         specifier: workspace:*
         version: link:../../packages/workflow
       '@tanstack/react-query':
@@ -135,7 +135,7 @@ importers:
 
   packages/ui:
     dependencies:
-      '@aco/shared':
+      '@flowntier/shared':
         specifier: workspace:*
         version: link:../shared
       '@radix-ui/react-slot':
@@ -190,7 +190,7 @@ importers:
 
   packages/workflow:
     dependencies:
-      '@aco/shared':
+      '@flowntier/shared':
         specifier: workspace:*
         version: link:../shared
       '@tanstack/react-query':

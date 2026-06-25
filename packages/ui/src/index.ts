@@ -1,5 +1,5 @@
 /**
- * @aco/ui — shared React components for the Mission Control UI.
+ * @flowntier/ui — shared React components for the Mission Control UI.
  *
  * See `docs/UI_GUIDELINES.md` for the design system.
  */

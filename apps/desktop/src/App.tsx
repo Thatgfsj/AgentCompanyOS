@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { PhaseTimeline, AgentCard, Card, type PhaseState, type AgentStatus } from '@aco/ui';
-import type { WfEvent } from '@aco/shared';
+import { PhaseTimeline, AgentCard, Card, type PhaseState, type AgentStatus } from '@flowntier/ui';
+import type { WfEvent } from '@flowntier/shared';
 import { TopBar } from './zones/TopBar.js';
 import { LeftRoster } from './zones/LeftRoster.js';
 import { RightPanel } from './zones/RightPanel.js';
@@ -8,8 +8,8 @@ import { BottomConsole } from './zones/BottomConsole.js';
 import { CommandDock } from './zones/CommandDock.js';
 import { Settings } from './zones/Settings.js';
 import { PluginsPanel } from './zones/PluginsPanel.js';
-import { ReasoningBubble } from '@aco/ui';
-import { ReviewVerdict } from '@aco/ui';
+import { ReasoningBubble } from '@flowntier/ui';
+import { ReviewVerdict } from '@flowntier/ui';
 import { PlanGraph, type PlanTaskNode, type PlanEdge } from './components/PlanGraph.js';
 import { useEventStream } from './hooks/useEventStream.js';
 import { invoke } from '@tauri-apps/api/core';
@@ -104,7 +104,7 @@ export function App() {
   const busyRef = useRef(false);
 
   // Subscribe to the runtime's WfEvent stream. v0.2.5+ delivers events
-  // over the `\\.\pipe\aco_runtime_events` named pipe → Rust → Tauri
+  // over the `\\.\pipe\flowntier_runtime_events` named pipe → Rust → Tauri
   // `wf:event` broadcast. No more raw WebSocket from the webview.
   const runtimeEvents = useEventStream();
   useEffect(() => {
@@ -115,8 +115,8 @@ export function App() {
 
   // Expose for screenshot / debug scripts.
   useEffect(() => {
-    // @ts-expect-error: window.__acoCurrentWfId is a debug hook
-    window.__acoCurrentWfId = currentWfId;
+    // @ts-expect-error: window.__flowntierCurrentWfId is a debug hook
+    window.__flowntierCurrentWfId = currentWfId;
   }, [currentWfId]);
 
   // Whenever a new workflow starts, poll /plan until it's ready

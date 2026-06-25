@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Card, ReasoningBubble, ReviewVerdict } from '@aco/ui';
+import { Card, ReasoningBubble, ReviewVerdict } from '@flowntier/ui';
 
 export interface CenterPanelProps {
   chiefCard: ReactNode;

@@ -5,7 +5,7 @@
  * Uses a ref to avoid re-triggering the effect on callback identity changes.
  *
  * v0.2.5+: the health check goes through Tauri `invoke('health_check')`
- * which talks to the Python sidecar over the `\\.\pipe\aco_runtime`
+ * which talks to the Rust runtime over the `\\.\pipe\flowntier_runtime`
  * named pipe. No browser fetch, no port 7317.
  */
 

@@ -4,7 +4,7 @@ version     = { workspace = true }
 edition     = { workspace = true }
 rust-version = { workspace = true }
 license     = { workspace = true }
-description = "Configuration loading and validation for ACO (aco.toml, providers.toml, router.toml)"
+description = "Configuration loading and validation for Flowntier (flowntier.toml, providers.toml, router.toml)"
 
 [lints.clippy]
 all = { level = "deny", priority = -1 }

@@ -6,7 +6,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import type { WfEvent, LogLevel } from '@aco/shared';
+import type { WfEvent, LogLevel } from '@flowntier/shared';
 
 export interface PerTaskConsoleProps {
   taskId: string;

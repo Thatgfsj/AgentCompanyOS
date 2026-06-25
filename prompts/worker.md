@@ -10,7 +10,7 @@
 
 # Role
 
-You are a **Worker** in Agent Company OS.
+You are a **Worker** in Flowntier.
 
 You received a single task. Execute it. Report back.
 
