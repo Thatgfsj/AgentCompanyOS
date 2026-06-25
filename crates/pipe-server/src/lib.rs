@@ -1,4 +1,4 @@
-//! Local IPC server for ACO (v0.3+).
+//! Local IPC server for Flowntier (v0.3+).
 //!
 //! Replaces `apps/runtime/src/aco_runtime/pipe_server.py`
 //! with a pure-Rust implementation that runs in the same

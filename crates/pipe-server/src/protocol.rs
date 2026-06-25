@@ -1,4 +1,4 @@
-//! Wire protocol for the ACO pipe server.
+//! Wire protocol for the Flowntier pipe server.
 //!
 //! Two channels (newline-delimited JSON, message-mode framing):
 //!

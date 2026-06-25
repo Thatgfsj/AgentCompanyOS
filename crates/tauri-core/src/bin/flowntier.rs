@@ -14,13 +14,13 @@ use tracing_subscriber::EnvFilter;
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "aco",
+    name = "flowntier",
     version,
-    about = "Agent Company OS — headless CLI",
+    about = "Flowntier — headless CLI",
     long_about = None
 )]
 struct Cli {
-    /// Path to a custom `aco.toml` (default: OS-specific).
+    /// Path to a custom `flowntier.toml` (default: OS-specific).
     #[arg(long, global = true)]
     config: Option<PathBuf>,
 
@@ -37,7 +37,7 @@ enum Command {
         /// The request text.
         request: String,
     },
-    /// Show ACO version and paths.
+    /// Show Flowntier version and paths.
     Info,
 }
 
@@ -70,11 +70,11 @@ async fn doctor() -> Result<()> {
 }
 
 async fn run(_request: &str) -> Result<()> {
-    anyhow::bail!("`aco run` is not implemented yet; coming in Phase 1 (see plans/Phase1.md)")
+    anyhow::bail!("`flowntier run` is not implemented yet; coming in Phase 1 (see plans/Phase1.md)")
 }
 
 fn info() -> Result<()> {
-    println!("aco {}", env!("CARGO_PKG_VERSION"));
-    println!("data dir: <see `aco doctor` to initialize>");
+    println!("flowntier {}", env!("CARGO_PKG_VERSION"));
+    println!("data dir: <see `flowntier doctor` to initialize>");
     Ok(())
 }

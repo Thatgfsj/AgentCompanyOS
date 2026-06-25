@@ -61,7 +61,7 @@ disable rules in code; fix the code.
 | DB table          | snake_case, plural                  | `workflow_logs`      |
 | DB column         | snake_case                          | `wf_id`              |
 | File path         | forward slashes                     | `src/auth/login.py`  |
-| Env var           | UPPER_SNAKE, `ACO_` prefix          | `ACO_LOG_LEVEL`      |
+| Env var           | UPPER_SNAKE, `FLOWNTIER_` prefix    | `FLOWNTIER_LOG_LEVEL`|
 
 ---
 

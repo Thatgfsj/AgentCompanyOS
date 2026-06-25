@@ -1,4 +1,4 @@
-//! Storage layer: SQLite + FTS5 for ACO.
+//! Storage layer: SQLite + FTS5 for Flowntier.
 //!
 //! All database access goes through this crate. No raw SQL elsewhere.
 //!

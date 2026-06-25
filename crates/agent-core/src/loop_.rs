@@ -2,7 +2,7 @@
 //!
 //! This is the v0.3 core. It owns a [`Provider`], a
 //! [`ToolRegistry`], a [`ContextManager`], and emits an
-//! [`AgentEvent`] stream that the rest of ACO subscribes to.
+//! [`AgentEvent`] stream that the rest of Flowntier subscribes to.
 
 use std::sync::Arc;
 use std::time::Instant;

@@ -10,13 +10,11 @@ description = "JSON-RPC + event-push server over a local IPC channel for Flownti
 all      = { level = "deny", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
 
-# Binary name was renamed from `aco-runtime` to `flowntier-runtime`
-# in the 2026-06-24 rebrand; the source file is kept as
-# `aco-runtime.rs` to preserve git history, so we bind the artifact
-# name explicitly here.
+# Binary name: `flowntier-runtime` (renamed from `aco-runtime` in
+# the 2026-06-24 rebrand). Source file lives at src/bin/flowntier-runtime.rs.
 [[bin]]
 name = "flowntier-runtime"
-path = "src/bin/aco-runtime.rs"
+path = "src/bin/flowntier-runtime.rs"
 
 [dependencies]
 tokio        = { workspace = true, features = ["full"] }

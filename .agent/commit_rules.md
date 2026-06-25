@@ -82,7 +82,7 @@ the message still must match `<type>: <subject>`.
 feat(workflow): add workflow resume from JSONL
 
 A user can now resume any workflow from the last stable state
-by re-running `aco run --resume <wf_id>`. The runtime reads
+by re-running `flowntier run --resume <wf_id>`. The runtime reads
 the JSONL log, finds the last non-terminal state, and rebuilds
 the in-memory state machine from there.
 
