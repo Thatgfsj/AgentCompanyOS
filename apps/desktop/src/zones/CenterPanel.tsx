@@ -13,7 +13,7 @@ export interface CenterPanelProps {
    * Optional callback for the empty-state "Try sample" button.
    * If absent, the button is hidden (e.g. during loading).
    */
-  onTrySample?: () => void;
+  onTrySample?: (() => void) | undefined;
 }
 
 /**
