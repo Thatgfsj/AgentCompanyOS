@@ -396,6 +396,21 @@ impl Repository {
         Ok(res.rows_affected() > 0)
     }
 
+    /// Update only the `last_used_at` column. Used by the secret
+    /// store as an audit trail when reveal() is called.
+    pub async fn touch_secret_last_used(
+        &self,
+        name: &str,
+    ) -> Result<bool, StorageError> {
+        let res = sqlx::query(
+            "UPDATE secret SET last_used_at = strftime('%s','now') WHERE name = ?",
+        )
+        .bind(name)
+        .execute(&self.pool)
+        .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
     // ── Provider CRUD ───────────────────────────────────────────
 
     pub async fn get_provider(&self, id: &str) -> Result<Option<ProviderRow>, StorageError> {

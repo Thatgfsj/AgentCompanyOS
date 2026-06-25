@@ -17,6 +17,7 @@ pub mod dispatcher;
 pub mod handlers;
 pub mod i_ching;
 pub mod protocol;
+pub mod secrets;
 pub mod server;
 
 pub use dispatcher::Dispatcher;
