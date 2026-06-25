@@ -27,18 +27,74 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": [
-      "icons/icon.ico"
-    ],
     "category": "DeveloperTool",
     "shortDescription": "Flowntier — AI software company on your desktop",
     "longDescription": "Flowntier — a visual AI software company powered by multi-agent workflow.",
+    "publisher": "Thatgfsj",
+    "copyright": "Copyright © 2026 Thatgfsj",
+    "homepage": "https://github.com/Thatgfsj/Flowntier",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "externalBin": [
       "binaries/flowntier_runtime"
     ],
     "resources": [
       "WebView2Loader.dll"
     ],
-    "publisher": "Thatgfsj"
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "installMode": "perMachine",
+        "languages": ["SimpChinese", "English"],
+        "displayLanguageSelector": true,
+        "deleteAppDataOnUninstall": false,
+        "allowElevation": true,
+        "createDesktopShortcut": true,
+        "createStartMenuShortcut": true,
+        "shortcutName": "Flowntier"
+      },
+      "wix": {
+        "language": ["en-US", "zh-CN"]
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "entitlements": null,
+      "providerShortName": "Thatgfsj",
+      "exceptionDomain": ""
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1",
+          "libnss3",
+          "libxss1",
+          "libasound2"
+        ]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": true,
+      "endpoints": [
+        "https://github.com/Thatgfsj/Flowntier/releases/latest/download/{{target}}-{{arch}}.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk0ODM1MTQ5RUE2QTcwN0MKUldSOGNHcnFTVkdEbEJJYklQZDdabzFtMUNzbFNQQlpnaFV2WWtuY0RSaTVHLy9HWHhPTU9Gb2IK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
