@@ -10,12 +10,11 @@ Flowntier ships three operating systems from the same Rust workspace:
 | OS      | Targets                            | Bundle formats                          |
 |---------|------------------------------------|-----------------------------------------|
 | Windows | `x86_64-pc-windows-msvc`           | NSIS `.exe` + WiX `.msi`               |
-| macOS   | `aarch64-apple-darwin` (Apple Silicon) | `.app` + `.dmg`                        |
 | Linux   | `x86_64-unknown-linux-gnu`         | `.deb` + `.AppImage`                    |
 
-macOS Intel and Linux RPM are deferred to v0.5 — see ROADMAP.md.
+macOS and Linux RPM are deferred to v0.5 — see ROADMAP.md.
 
-The CI matrix builds all three. See `.github/workflows/release.yml`.
+The CI matrix builds both. See `.github/workflows/release.yml`.
 
 ---
 
@@ -26,8 +25,6 @@ The CI matrix builds all three. See `.github/workflows/release.yml`.
 | Windows NSIS setup                          | `target/release/bundle/nsis/Flowntier_<v>_x64-setup.exe`            | ~31 MB      |
 | Windows WiX MSI                             | `target/release/bundle/msi/Flowntier_<v>_x64_en-US.msi`             | ~40 MB      |
 | Windows standalone `.exe`                   | `target/release/flowntier-desktop.exe`                              | ~16 MB      |
-| macOS `.app`                                | `target/release/bundle/macos/Flowntier.app`                         | ~75 MB      |
-| macOS `.dmg`                                | `target/release/bundle/dmg/Flowntier_<v>_aarch64.dmg`               | ~75 MB      |
 | Linux `.deb`                                | `target/release/bundle/deb/Flowntier_<v>_amd64.deb`                 | ~50 MB      |
 | Linux `.AppImage`                           | `target/release/bundle/appimage/Flowntier_<v>_amd64.AppImage`       | ~80 MB      |
 
@@ -59,8 +56,6 @@ refreshed in Phase 6 after the final `pnpm tauri:build` smoke test.
   2 bundler; no manual install needed)
 * **Linux build host** (Ubuntu 22.04+ recommended):
   `apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf build-essential libssl-dev`
-* **macOS build host**: Xcode Command Line Tools
-  (`xcode-select --install`)
 
 The first release build is slow (~10 minutes) because the release
 profile compiles `tao`, `wry`, and `tauri` from scratch. Incremental
@@ -87,7 +82,7 @@ cd apps/desktop
 pnpm tauri:build
 ```
 
-Output goes to `apps/desktop/target/release/bundle/{nsis,msi,macos,dmg,deb,appimage}/`.
+Output goes to `apps/desktop/target/release/bundle/{nsis,msi,deb,appimage}/`.
 
 ### Faster alternatives for iteration
 
@@ -152,7 +147,6 @@ The interesting fields:
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/icon.icns",
       "icons/icon.ico"
     ],
     "externalBin": ["binaries/flowntier_runtime"],
@@ -166,7 +160,6 @@ The interesting fields:
       },
       "wix": { "language": ["en-US"] }
     },
-    "macOS": { "minimumSystemVersion": "11.0" },
     "linux": {
       "deb": {
         "depends": [
@@ -307,14 +300,15 @@ In v0.4 the installer is **unsigned**:
 * Windows SmartScreen will show "Unknown publisher" on first
   launch. Users click **More info → Run anyway**.
 * macOS Gatekeeper will block the `.dmg` on first launch. Users
-  right-click → Open.
+  right-click → Open. (Not in v0.4; macOS deferred to v0.5.)
 * Linux `.deb` will install without warning; `.AppImage` will
   ask for execute permission.
 
 Adding code signing is a v0.5 follow-up. For Windows, an EV cert
 from DigiCert / Sectigo (~$300–500/yr, stored on a hardware token)
-is required for SmartScreen reputation. For macOS, an Apple
-Developer ID cert + notarisation. See `docs/SECURITY.md` for the
+is required for SmartScreen reputation. macOS notarisation
+  (an Apple Developer ID cert + `xcrun notarytool`) lands with
+  the macOS support in v0.5. See `docs/SECURITY.md` for the
 threat model and why we deferred this.
 
 ---
@@ -352,7 +346,9 @@ Logs land at `%APPDATA%\flowntier\logs\flowntier.log.YYYY-MM-DD`
 * **Removed**: `acme.sh` certbot step from CI (no HTTPS yet).
 * **Added**: `bundle.windows.nsis` so the installer produces
   a real uninstaller.
-* **Added**: `bundle.macOS` for `.dmg` packaging.
+* **Added**: `bundle.macOS` for `.dmg` packaging. (Phase 1
+  shipped this; Phase 0.5 removed it because the chairman
+  scoped v0.4 to Windows + Linux only. macOS resumes in v0.5.)
 * **Added**: `bundle.linux.deb.depends` so `.deb` declares its
   runtime libraries.
 * **Added**: `tauri-plugin-updater` with GitHub Releases endpoint.

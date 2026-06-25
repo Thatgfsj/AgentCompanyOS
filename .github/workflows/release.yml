@@ -72,9 +72,6 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ext: .exe
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            ext: ''
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             ext: ''
@@ -132,8 +129,6 @@ jobs:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-          - os: macos-latest
-            target: aarch64-apple-darwin
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
 
@@ -151,8 +146,8 @@ jobs:
           workspaces: 'crates/ -> target'
           cache-on-failure: true
 
-      # macOS deps (kept here because they are only needed for the
-      # Tauri build, not the sidecar build).
+      # Linux build deps. macOS was dropped from the v0.4 matrix
+      # per the chairman's directive (re-added in v0.5).
       - name: Install Linux deps (Tauri 2 + webkit2gtk 4.1)
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -210,7 +205,8 @@ jobs:
           releaseName: 'Flowntier ${{ github.ref_name }}'
           # Use the matrix target so each runner only builds for its
           # own arch; the matrix.os × matrix.target join gives us
-          # windows+x64, macos+arm64, linux+x64.
+          # windows+x64, linux+x64. macOS is out of scope for v0.4
+          # (deferred to v0.5 — see ROADMAP.md).
           args: --target ${{ matrix.target }}
 
   # ──────────────────────────────────────────────────────────────
