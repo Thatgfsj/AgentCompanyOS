@@ -114,13 +114,26 @@ export function Welcome({ onComplete }: WelcomeProps) {
 
   return (
     <div className="flex h-screen w-screen flex-col items-center justify-start overflow-y-auto bg-surface-1 px-6 py-10 text-text-primary">
-      {/* Top progress bar: 3 dots */}
-      <div className="mb-8 flex items-center gap-2">
+      {/* Top bar: progress dots on the left, "Skip all" link on the right.
+          Skip-all goes straight to step 3 (enter workspace) without
+          finishing the in-between steps. Useful for power users who
+          already know what they're doing. */}
+      <div className="mb-8 flex w-full max-w-2xl items-center gap-2">
         <ProgressDot active={step >= 1} label="添加供应商" />
         <Connector />
         <ProgressDot active={step >= 2} label="示例任务" />
         <Connector />
         <ProgressDot active={step >= 3} label="开始使用" />
+        <div className="flex-1" />
+        {step < 3 && (
+          <button
+            type="button"
+            onClick={() => setStep(3)}
+            className="text-xs text-text-secondary underline hover:text-text-primary"
+          >
+            跳过所有步骤 →
+          </button>
+        )}
       </div>
 
       <div className="w-full max-w-2xl">
@@ -171,6 +184,7 @@ function Step1(props: {
         onBack={undefined}
         onNext={props.onSkip}
         nextLabel="跳过此步"
+        skipDisabled={props.providers.length === 0}
       />
     </Card>
   );
@@ -375,6 +389,7 @@ function Footer(props: {
   nextDisabled?: boolean;
   onSkip?: () => void;
   skipLabel?: string;
+  skipDisabled?: boolean;
 }) {
   return (
     <div className="mt-6 flex items-center justify-between">
@@ -394,7 +409,8 @@ function Footer(props: {
           <button
             type="button"
             onClick={props.onSkip}
-            className="text-sm text-text-secondary hover:text-text-primary"
+            disabled={props.skipDisabled}
+            className="text-sm text-text-secondary hover:text-text-primary disabled:opacity-50"
           >
             {props.skipLabel ?? '跳过'}
           </button>

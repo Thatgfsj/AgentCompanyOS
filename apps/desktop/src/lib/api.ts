@@ -160,6 +160,46 @@ export async function getWorkflowPlan(id: string): Promise<Record<string, unknow
   return invoke('get_workflow', { id });
 }
 
+// ── KV (Phase 4 onboarding state) ───────────────────────────────
+// Generic key/value store backed by the SQLite `kv` table.
+// Used for the first_run flag that gates the Welcome screen,
+// the user's last-selected tab, etc. Always returns null
+// if the key is unset (we use `null` as the "absent" sentinel).
+
+export async function kvGet<T = unknown>(key: string): Promise<T | null> {
+  try {
+    const r = await invoke<{ k: string; v: T | null }>('kv_get', { key });
+    return r.v;
+  } catch (e) {
+    console.warn('[api] kvGet failed:', key, e);
+    return null;
+  }
+}
+
+export async function kvSet<T = unknown>(key: string, value: T): Promise<void> {
+  await invoke('kv_set', { key, value });
+}
+
+export async function resetOnboarding(): Promise<void> {
+  // Set first_run=true so the Welcome screen re-appears on the
+  // next launch. The user re-triggers via Settings → About.
+  await kvSet('first_run', 'true');
+}
+
+// ── Sample workflow (Phase 4 onboarding) ───────────────────────
+
+export interface SampleWorkflow {
+  name: string;
+  display_name: string;
+  description: string;
+  user_request: string;
+  expected_tasks: string[];
+}
+
+export async function loadSampleWorkflow(): Promise<SampleWorkflow> {
+  return invoke('load_sample_workflow');
+}
+
 // ── Helpers ──────────────────────────────────────────────────────
 
 function sleep(ms: number): Promise<void> {
