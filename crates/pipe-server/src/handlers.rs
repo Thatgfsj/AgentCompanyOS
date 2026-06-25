@@ -13,6 +13,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use crate::dispatcher::Dispatcher;
+use crate::secrets::SecretStore;
 
 /// Shared state held by the pipe server.
 #[derive(Clone)]
@@ -23,17 +24,45 @@ pub struct ServerState {
     pub tools: Arc<ToolRegistry>,
     /// CWD-style workspace root for the current pipe server run.
     pub workspace: Workspace,
+    /// v0.4: persistent secret store (OS keystore + AES-GCM).
+    pub secrets: Arc<SecretStore>,
+    /// v0.4: SQLite repository for provider / custom_provider /
+    /// kv tables.
+    pub repo: Arc<storage::Repository>,
 }
 
 impl ServerState {
-    /// New default state. The event channel is bounded so a
-    /// slow subscriber cannot grow memory unboundedly.
-    pub fn new(workspace_root: std::path::PathBuf) -> Self {
+    /// New default state. Opens the SQLite repo at
+    /// `<data_dir>/storage.sqlite` and constructs a SecretStore
+    /// bound to the same data dir.
+    pub async fn new(
+        workspace_root: std::path::PathBuf,
+        data_dir: std::path::PathBuf,
+    ) -> Self {
         let (events, _rx) = broadcast::channel(1024);
+
+        let db_path = data_dir.join("storage.sqlite");
+        let repo = match storage::Repository::open(&db_path).await {
+            Ok(r) => Arc::new(r),
+            Err(e) => {
+                eprintln!("[flowntier-runtime] failed to open storage: {e}");
+                // Fallback to in-memory; the v0.4 secret endpoints
+                // will work but data won't persist.
+                Arc::new(
+                    storage::Repository::open_in_memory()
+                        .await
+                        .expect("in-memory storage always opens"),
+                )
+            }
+        };
+        let secrets = Arc::new(SecretStore::new(repo.clone(), data_dir));
+
         Self {
             events,
             tools: Arc::new(ToolRegistry::with_builtins()),
             workspace: Workspace::new(workspace_root, "flowntier"),
+            secrets,
+            repo,
         }
     }
 }
@@ -89,37 +118,96 @@ pub fn register_all(d: &mut Dispatcher, state: ServerState) {
     // handlers_i_ching module because they belong to a
     // different domain (provider / router / secret store /
     // plugin registry) and have no shared logic to factor out.
-    register_placeholder_handlers(d);
+    register_placeholder_handlers(d, state.clone());
 }
 
-fn register_placeholder_handlers(d: &mut Dispatcher) {
-    // ── Secrets: keychain-backed config store. Tauri shell
-    // proxies user API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY,
-    // etc.) through these endpoints. The Rust sidecar has no
-    // keychain of its own in v0.3, so we return an empty list
-    // and no-op for writes — the Tauri shell already keeps a
-    // keyring on the webview side via the @tauri-apps/plugin-keyring
-    // plugin; this endpoint is a stub for that.
-    d.register("GET", "/api/settings/secrets", |_body| {
-        Box::pin(async {
-            Ok((
-                200,
-                json!({
-                    "secrets": [],
-                    "note": "Rust sidecar is a stub for secret storage; the Tauri webview owns the keyring in v0.3.",
-                }),
-            ))
+fn register_placeholder_handlers(d: &mut Dispatcher, state: Arc<ServerState>) {
+    // ── Secrets: v0.4 real persistence (OS keystore + AES-GCM).
+    // The Tauri shell writes a plaintext via PUT
+    // /api/settings/secrets/{name}; the pipe server encrypts
+    // with the OS keystore DEK and stores ciphertext + nonce
+    // in SQLite. The plaintext is never returned to the UI
+    // (only metadata). The agent loop calls GET
+    // /api/settings/secrets/{name}/reveal to fetch the plaintext
+    // at runtime.
+    let list_state = state.clone();
+    d.register("GET", "/api/settings/secrets", move |_body| {
+        let s = list_state.clone();
+        Box::pin(async move {
+            match s.secrets.list().await {
+                Ok(list) => Ok((200, json!({ "secrets": list, "count": list.len() }))),
+                Err(e) => Ok((500, json!({ "error": format!("list_secrets: {e}") }))),
+            }
         })
     });
-    d.register("POST", "/api/settings/secrets/seed", |_body| {
-        Box::pin(async {
-            Ok((
-                200,
-                json!({
-                    "seeded": [],
-                    "note": "stub",
-                }),
-            ))
+
+    let put_state = state.clone();
+    d.register("PUT", "/api/settings/secrets/{name}", move |body| {
+        let s = put_state.clone();
+        Box::pin(async move {
+            let name = body.get("name").and_then(|v| v.as_str())
+                .ok_or_else(|| "missing 'name' in path".to_string())?.to_string();
+            let value = body.get("value").and_then(|v| v.as_str())
+                .ok_or_else(|| "missing 'value' in body".to_string())?.to_string();
+            if value.len() > 4096 {
+                return Ok((400, json!({ "error": "secret value exceeds 4 KiB cap" })));
+            }
+            if name.is_empty() || name.len() > 128 {
+                return Ok((400, json!({ "error": "secret name must be 1..=128 chars" })));
+            }
+            match s.secrets.put(&name, &value).await {
+                Ok(()) => Ok((200, json!({ "saved": true, "name": name }))),
+                Err(e) => Ok((500, json!({ "error": format!("put_secret: {e}") }))),
+            }
+        })
+    });
+
+    let del_state = state.clone();
+    d.register("DELETE", "/api/settings/secrets/{name}", move |body| {
+        let s = del_state.clone();
+        Box::pin(async move {
+            let name = body.get("name").and_then(|v| v.as_str())
+                .ok_or_else(|| "missing 'name' in path".to_string())?.to_string();
+            match s.secrets.delete(&name).await {
+                Ok(removed) => Ok((200, json!({ "deleted": removed, "name": name }))),
+                Err(e) => Ok((500, json!({ "error": format!("delete_secret: {e}") }))),
+            }
+        })
+    });
+
+    // Internal-only: returns plaintext. The Tauri shell's IPC
+    // bridge should NOT expose this to the webview. Used by
+    // the agent loop when making provider requests.
+    let reveal_state = state.clone();
+    d.register("GET", "/api/settings/secrets/{name}/reveal", move |body| {
+        let s = reveal_state.clone();
+        Box::pin(async move {
+            let name = body.get("name").and_then(|v| v.as_str())
+                .ok_or_else(|| "missing 'name' in path".to_string())?.to_string();
+            match s.secrets.reveal(&name).await {
+                Ok(value) => Ok((200, json!({ "name": name, "value": value }))),
+                Err(crate::secrets::SecretStoreError::NotFound(_)) => {
+                    Ok((404, json!({ "error": "not found", "name": name })))
+                }
+                Err(e) => Ok((500, json!({ "error": format!("reveal: {e}") }))),
+            }
+        })
+    });
+
+    // v0.4: trigger the legacy plaintext migration if a
+    // v0.3-era secrets.json exists at <data_dir>/secrets.json.
+    let seed_state = state.clone();
+    d.register("POST", "/api/settings/secrets/seed", move |_body| {
+        let s = seed_state.clone();
+        Box::pin(async move {
+            let legacy = s.secrets.data_dir().join("secrets.json");
+            match s.secrets.migrate_legacy_plaintext(&legacy).await {
+                Ok(n) => Ok((200, json!({
+                    "seeded": n,
+                    "source": legacy.display().to_string(),
+                }))),
+                Err(e) => Ok((500, json!({ "error": format!("seed: {e}") }))),
+            }
         })
     });
 

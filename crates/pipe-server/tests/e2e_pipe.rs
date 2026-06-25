@@ -99,7 +99,11 @@ async fn spawn_server(tag: &str) -> (String, tokio::task::JoinHandle<std::io::Re
         events_path,
     };
     let mut d = Dispatcher::new();
-    let state = ServerState::new(std::env::temp_dir());
+    let state = ServerState::new(
+        std::env::temp_dir(),
+        std::env::temp_dir().join("flowntier-e2e-test"),
+    )
+    .await;
     register_all(&mut d, state.clone());
     let server = Server::new(cfg, d, state.events.clone());
     let handle = tokio::spawn(async move { server.run().await });
