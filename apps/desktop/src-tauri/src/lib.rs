@@ -410,8 +410,8 @@ async fn add_custom_provider(
 ) -> Result<serde_json::Value, String> {
     // Register a user-defined provider (relay station / private
     // gateway). Body shape matches the Python `register_custom`
-    // signature; the persistence happens in Python
-    // (~/.aco/custom_providers.json).
+    // signature; the persistence happens in the pipe-server's
+    // SQLite (custom_provider table).
     pipe_request(
         "POST",
         "/api/providers/custom",

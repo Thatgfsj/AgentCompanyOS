@@ -4,7 +4,7 @@ version     = { workspace = true }
 edition     = { workspace = true }
 rust-version = { workspace = true }
 license     = { workspace = true }
-description = "Embedded agent loop, tool registry, provider clients, and prompt engine for ACO (v0.3+). Replaces the Python runtime and Claude Code CLI sidecar."
+description = "Embedded agent loop, tool registry, provider clients, and prompt engine for Flowntier (v0.3+). Replaces the Python runtime and Claude Code CLI sidecar."
 
 [lints.clippy]
 all      = { level = "deny", priority = -1 }

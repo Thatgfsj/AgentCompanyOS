@@ -20,7 +20,7 @@ async fn main() -> std::io::Result<()> {
                 }
             }
             "--rpc" => {
-                eprintln!("--rpc override is honoured by ACO_RPC_PIPE env var instead");
+                eprintln!("--rpc override is honoured by FLOWNTIER_RPC_PIPE env var instead");
             }
             _ => {
                 eprintln!("ignoring unknown arg: {arg}");
@@ -29,7 +29,7 @@ async fn main() -> std::io::Result<()> {
     }
 
     let cfg = ServerConfig::default();
-    tracing::info!(rpc = %cfg.rpc_path, events = %cfg.events_path, workspace = %workspace.display(), "starting aco-runtime (Rust)");
+    tracing::info!(rpc = %cfg.rpc_path, events = %cfg.events_path, workspace = %workspace.display(), "starting flowntier-runtime (Rust)");
 
     let mut d = Dispatcher::new();
     let state = ServerState::new(workspace);

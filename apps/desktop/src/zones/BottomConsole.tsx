@@ -1,5 +1,5 @@
-import { ConsoleLine, type ConsoleSource } from '@aco/ui';
-import type { WfEvent, LogLevel } from '@aco/shared';
+import { ConsoleLine, type ConsoleSource } from '@flowntier/ui';
+import type { WfEvent, LogLevel } from '@flowntier/shared';
 
 export interface BottomConsoleProps {
   events: readonly WfEvent[];

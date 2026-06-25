@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { WfEvent } from '@aco/shared';
+import type { WfEvent } from '@flowntier/shared';
 
 interface WorkflowState {
   currentWfId: string | null;

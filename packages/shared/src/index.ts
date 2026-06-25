@@ -1,5 +1,5 @@
 /**
- * @aco/shared — cross-language types for ACO.
+ * @flowntier/shared — cross-language types for ACO.
  *
  * This package is the **source of truth** for IPC events, errors,
  * and protocol messages. Rust and Python generate their own types

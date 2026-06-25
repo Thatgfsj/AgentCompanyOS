@@ -20,7 +20,7 @@ document that satisfies the [Chief Agent prompt's plan structure](../chief_agent
 * The user's clarified request (the Chief has already resolved
   ambiguities via `USER_QUERY`).
 * Any project memory relevant to the request (the Chief attaches it).
-* The current `aco.toml` for budget constraints.
+* The current `flowntier.toml` for budget constraints.
 * A token budget for your output.
 
 You do **not** see other workflows, other critics' opinions, or
@@ -64,7 +64,7 @@ the Chief Agent prompt exactly:
 1. **Always** produce a task graph, even for "trivial" features.
    A trivial feature has 1 task; that's still a graph.
 2. **Estimate tokens per task** conservatively. The sum must be
-   ≤ `max_total_tokens` from `aco.toml` (default 5M).
+   ≤ `max_total_tokens` from `flowntier.toml` (default 5M).
 3. **No task may have > 5 dependencies.** If it would, split it.
 4. **Acceptance criteria must be testable.** `automated: true`
    requires a concrete command (`cargo test --test foo`,

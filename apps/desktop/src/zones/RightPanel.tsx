@@ -5,8 +5,8 @@
  */
 
 import { useState } from 'react';
-import { Card, TaskItem, type TaskState } from '@aco/ui';
-import type { WfEvent } from '@aco/shared';
+import { Card, TaskItem, type TaskState } from '@flowntier/ui';
+import type { WfEvent } from '@flowntier/shared';
 import { PerTaskConsole } from '../components/PerTaskConsole.js';
 
 export interface RightPanelTask {

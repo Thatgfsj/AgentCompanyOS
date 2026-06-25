@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { WfEvent } from '@aco/shared';
+import type { WfEvent } from '@flowntier/shared';
 
 /**
  * Subscribe to the ACO event stream. Tauri v2 ships events via the

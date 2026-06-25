@@ -1,6 +1,6 @@
-//! Configuration loading for ACO.
+//! Configuration loading for Flowntier.
 //!
-//! Reads `aco.toml`, `providers.toml`, and `router.toml` from the
+//! Reads `flowntier.toml`, `providers.toml`, and `router.toml` from the
 //! filesystem, validates them, and exposes typed structs.
 //!
 //! **No secrets live in these files.** API keys come from environment
@@ -275,7 +275,7 @@ pub enum ConfigError {
     UnknownProvider(String),
 }
 
-/// Load `aco.toml` from the given path.
+/// Load `flowntier.toml` from the given path.
 pub fn load_aco_config(path: &Path) -> Result<AcoConfig, ConfigError> {
     let text = std::fs::read_to_string(path)?;
     let cfg: AcoConfig = toml::from_str(&text).map_err(|source| ConfigError::Toml {

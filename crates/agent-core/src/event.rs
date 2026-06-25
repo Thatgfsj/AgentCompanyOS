@@ -1,6 +1,6 @@
 //! Events emitted by the agent loop.
 //!
-//! These are published to the rest of ACO (Tauri webview, event
+//! These are published to the rest of Flowntier (Tauri webview, event
 //! log, etc.) so the UI can render the agent's actions as they
 //! happen.
 

@@ -1,0 +1,69 @@
+name: Bug report
+description: Report something that isn't working.
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      description: Which OS are you running?
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS 14 (Sonoma)
+        - macOS 13 (Ventura)
+        - Ubuntu 24.04
+        - Ubuntu 22.04
+        - Fedora 40
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Flowntier version
+      description: Settings → About, or `flowntier info` in the standalone CLI.
+      placeholder: v0.4.0
+    validations:
+      required: true
+
+  - type: input
+    id: install
+    attributes:
+      label: Installer
+      description: Which artifact did you install? (NSIS / MSI / standalone exe / AppImage / deb / dmg)
+      placeholder: NSIS
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: What did you do, what did you expect, what happened instead?
+      placeholder: |
+        1. Open Flowntier
+        2. Click 'Add AI Provider'
+        3. Paste a valid OpenAI key
+        4. Click Save
+        5. Restart Flowntier
+        6. Open Settings again — the key is gone
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: |
+        Paste the last ~50 lines of the log file:
+
+        * Windows : `%APPDATA%\flowntier\logs\flowntier.log.YYYY-MM-DD`
+        * macOS   : `~/Library/Application Support/flowntier/logs/flowntier.log.YYYY-MM-DD`
+        * Linux   : `~/.config/flowntier/logs/flowntier.log.YYYY-MM-DD`
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, workarounds, related issues.

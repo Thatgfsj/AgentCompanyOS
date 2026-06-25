@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Flowntier documentation
+    url: https://github.com/Thatgfsj/Flowntier/tree/main/docs
+    about: Architecture, threat model, release process, and acceptance reports.
+  - name: Security disclosures
+    url: https://github.com/Thatgfsj/Flowntier/blob/main/docs/SECURITY.md
+    about: Do not file public issues for security vulnerabilities — see the disclosure policy.

@@ -1,4 +1,4 @@
-import { AgentCard, type AgentStatus } from '@aco/ui';
+import { AgentCard, type AgentStatus } from '@flowntier/ui';
 
 export interface LeftRosterProps {
   chiefStatus: AgentStatus;
