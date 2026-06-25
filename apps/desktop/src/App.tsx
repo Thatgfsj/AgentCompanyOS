@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { check as checkUpdaterPlugin } from '@tauri-apps/plugin-updater';
 import { checkForUpdate, installUpdate, type UpdateBanner } from './lib/updater';
 import { PhaseTimeline, AgentCard, Card, type PhaseState, type AgentStatus } from '@flowntier/ui';
 import type { WfEvent } from '@flowntier/shared';
@@ -309,10 +310,7 @@ export function App() {
           // shows the confirm dialog itself.
           void (async () => {
             try {
-              const fresh = await checkForUpdate();
-              if (!fresh.available) return;
-              const { check } = await import('@tauri-apps/plugin-updater');
-              const upd = await check();
+              const upd = await checkUpdaterPlugin();
               if (upd) await installUpdate(upd);
               // If install succeeds, downloadAndInstall() will
               // trigger a relaunch; we don't need to update state.
