@@ -52,6 +52,11 @@ sqlx = { version = "0.8", default-features = false, features = [
 crossbeam-channel = "0.5"
 parking_lot       = "0.12"
 
+# HTTP client (used by /api/providers/{id}/models to fetch
+# the upstream /v1/models endpoint). We use rustls-tls so we
+# don't need OpenSSL on the build host.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+
 # Tauri (used by tauri-core; non-optional because Cargo workspace
 # deps cannot be optional — Rust 1.83+)
 tauri         = { version = "2" }

@@ -32,6 +32,8 @@ keyring      = { workspace = true }
 aes-gcm      = { workspace = true }
 base64       = "0.22"
 chrono       = { workspace = true }
+reqwest      = { workspace = true }
+ulid         = { workspace = true }
 
 # Agent core: the pipe server dispatches tasks into the in-process
 # agent runtime.
@@ -39,9 +41,6 @@ agent-core   = { path = "../agent-core" }
 
 # Storage: the v0.4 secret store and provider table.
 storage      = { path = "../storage" }
-
-# ulid for new custom_provider ids
-ulid         = { workspace = true }
 
 [dev-dependencies]
 tokio        = { workspace = true, features = ["test-util"] }

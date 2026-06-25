@@ -84,17 +84,15 @@ pub fn register_all(d: &mut Dispatcher, state: ServerState) {
         })
     });
 
-    // List providers — minimal; the full implementation lives in
-    // `crates/provider-presets` (W3 follow-up).
+    // List providers — v0.4 reads the 9 built-in presets from
+    // `providers::PRESETS` and joins them with the `provider`
+    // table for per-preset overrides (enabled, default_model,
+    // base_url) plus a `has_secret` flag from the secret store.
+    // The result also includes any custom_provider rows.
     let s2 = state.clone();
-    d.register("GET", "/api/providers", move |_body| {
-        let _ = &s2;
-        Box::pin(async {
-            Ok((200, json!({
-                "providers": [],
-                "note": "provider presets not yet wired in v0.3 W3",
-            })))
-        })
+    d.register("GET", "/api/providers", move |body| {
+        let s = s2.clone();
+        Box::pin(async move { list_providers(body, s).await })
     });
 
     // Run a workflow / task envelope. This is the central
@@ -243,49 +241,44 @@ fn register_placeholder_handlers(d: &mut Dispatcher, state: Arc<ServerState>) {
         })
     });
 
-    // Provider toggle / custom provider CRUD. v0.3 doesn't yet
-    // persist these; return 501-style 'not implemented' so the
-    // UI can surface a friendly message instead of the JSON-RPC
-    // generic error.
-    d.register("PATCH", "/api/providers/{id}", |_body| {
-        Box::pin(async {
-            Ok((
-                501,
-                json!({
-                    "error": "provider toggle not yet implemented in the Rust sidecar; v0.4 will persist this.",
-                }),
-            ))
-        })
+    // PATCH /api/providers/{id} — toggle enabled, override
+    // default_model, override base_url. Reads from body:
+    //   { enabled?: bool, default_model?: string|null,
+    //     base_url?: string|null }
+    // Body fields are individually optional; only those present
+    // are updated.
+    let patch_state = state.clone();
+    d.register("PATCH", "/api/providers/{id}", move |body| {
+        let s = patch_state.clone();
+        Box::pin(async move { patch_provider(body, s).await })
     });
-    d.register("GET", "/api/providers/{id}/models", |_body| {
-        Box::pin(async {
-            Ok((
-                501,
-                json!({
-                    "error": "live model fetch not yet implemented in the Rust sidecar; v0.4 will call each provider's /models endpoint.",
-                }),
-            ))
-        })
+
+    // GET /api/providers/{id}/models — list models. Tries the
+    // provider's /v1/models endpoint (if has_live_models_endpoint
+    // is true); falls back to ANTHROPIC_FALLBACK_MODELS for
+    // Anthropic. Caches results in `model_cache` for 1 hour.
+    let models_state = state.clone();
+    d.register("GET", "/api/providers/{id}/models", move |body| {
+        let s = models_state.clone();
+        Box::pin(async move { list_models(body, s).await })
     });
-    d.register("POST", "/api/providers/custom", |_body| {
-        Box::pin(async {
-            Ok((
-                501,
-                json!({
-                    "error": "custom providers are not yet persisted in the Rust sidecar.",
-                }),
-            ))
-        })
+
+    // POST /api/providers/custom — add a user-defined relay
+    // station / private gateway. Body:
+    //   { name: string, base_url: string,
+    //     kind: "openai-compatible" | "anthropic-compatible",
+    //     default_model?: string|null }
+    let custom_add_state = state.clone();
+    d.register("POST", "/api/providers/custom", move |body| {
+        let s = custom_add_state.clone();
+        Box::pin(async move { add_custom_provider(body, s).await })
     });
-    d.register("DELETE", "/api/providers/custom/{id}", |_body| {
-        Box::pin(async {
-            Ok((
-                501,
-                json!({
-                    "error": "custom provider deletion not yet implemented in the Rust sidecar.",
-                }),
-            ))
-        })
+
+    // DELETE /api/providers/custom/{id} — remove a custom provider.
+    let custom_del_state = state.clone();
+    d.register("DELETE", "/api/providers/custom/{id}", move |body| {
+        let s = custom_del_state.clone();
+        Box::pin(async move { delete_custom_provider(body, s).await })
     });
     d.register("PUT", "/api/router/roles", |body| {
         // PUT (update) variant — distinguished from GET above by
@@ -403,6 +396,331 @@ fn register_placeholder_handlers(d: &mut Dispatcher, state: Arc<ServerState>) {
             ))
         })
     });
+}
+
+// ── v0.4 provider endpoints ───────────────────────────────────
+
+/// GET /api/providers — list built-in presets + custom providers,
+/// joined with the per-preset `provider` row for overrides and
+/// `secret` table for `has_secret`.
+async fn list_providers(
+    _body: Value,
+    state: Arc<ServerState>,
+) -> Result<(u16, Value), String> {
+    // Pull all rows once.
+    let preset_rows = state.repo.list_providers().await
+        .map_err(|e| format!("list_providers: {e}"))?;
+    let secret_rows = state.secrets.list().await
+        .map_err(|e| format!("list_secrets: {e}"))?;
+    let custom_rows = state.repo.list_custom_providers().await
+        .map_err(|e| format!("list_custom: {e}"))?;
+
+    // Index overrides + secrets by id.
+    let override_by_id: std::collections::HashMap<&str, &storage::ProviderRow> =
+        preset_rows.iter().map(|p| (p.id.as_str(), p)).collect();
+    let secret_names: std::collections::HashSet<&str> =
+        secret_rows.iter().map(|s| s.name.as_str()).collect();
+
+    let presets: Vec<Value> = crate::providers::PRESETS.iter().map(|p| {
+        let ovr = override_by_id.get(p.id);
+        let enabled = ovr.map(|r| r.enabled).unwrap_or(true);
+        let default_model = ovr.and_then(|r| r.default_model.clone())
+            .unwrap_or_else(|| p.default_model.to_string());
+        let base_url = ovr.and_then(|r| r.base_url.clone())
+            .unwrap_or_else(|| p.base_url.to_string());
+        json!({
+            "id": p.id,
+            "kind": "preset",
+            "display_name": p.display_name,
+            "api_kind": p.kind,
+            "base_url": base_url,
+            "default_model": default_model,
+            "secret_name": p.secret_name,
+            "has_secret": secret_names.contains(p.secret_name),
+            "enabled": enabled,
+            "note": p.note,
+            "has_live_models_endpoint": p.has_live_models_endpoint,
+        })
+    }).collect();
+
+    let custom: Vec<Value> = custom_rows.iter().map(|c| {
+        let custom_secret = format!("CUSTOM_PROVIDER_KEY_{}", c.id);
+        json!({
+            "id": c.id,
+            "kind": "custom",
+            "display_name": c.name,
+            "api_kind": c.kind,
+            "base_url": c.base_url,
+            "default_model": c.default_model,
+            "secret_name": custom_secret,
+            "has_secret": secret_names.contains(custom_secret.as_str()),
+            "enabled": c.enabled,
+            "note": null,
+            "has_live_models_endpoint": c.kind == "openai-compatible",
+        })
+    }).collect();
+
+    Ok((200, json!({
+        "providers": presets,
+        "custom_providers": custom,
+        "count": presets.len() + custom.len(),
+    })))
+}
+
+/// PATCH /api/providers/{id} — toggle enabled, override
+/// default_model, override base_url. Reads from body:
+///   { enabled?: bool, default_model?: string|null,
+///     base_url?: string|null }
+async fn patch_provider(
+    body: Value,
+    state: Arc<ServerState>,
+) -> Result<(u16, Value), String> {
+    let id = body.get("id").and_then(|v| v.as_str())
+        .ok_or_else(|| "missing 'id' in path".to_string())?.to_string();
+
+    // Built-in presets: validate id + upsert into the `provider`
+    // table (which was pre-populated by migration 0003).
+    if crate::providers::get(&id).is_none() {
+        return Ok((404, json!({ "error": format!("unknown provider: {id}") })));
+    }
+
+    // Load current row, merge with patch fields.
+    let mut row = state.repo.get_provider(&id).await
+        .map_err(|e| format!("get_provider: {e}"))?
+        .unwrap_or_else(|| storage::ProviderRow {
+            id: id.clone(),
+            enabled: true,
+            default_model: None,
+            base_url: None,
+            preset_json: "{}".into(),
+            updated_at: chrono::Utc::now().timestamp(),
+        });
+    let now = chrono::Utc::now().timestamp();
+    let mut changed: Vec<&str> = Vec::new();
+    if let Some(v) = body.get("enabled").and_then(|v| v.as_bool()) {
+        row.enabled = v;
+        changed.push("enabled");
+    }
+    if let Some(v) = body.get("default_model") {
+        row.default_model = v.as_str().map(|s| s.to_string());
+        changed.push("default_model");
+    }
+    if let Some(v) = body.get("base_url") {
+        row.base_url = v.as_str().map(|s| s.to_string());
+        changed.push("base_url");
+    }
+    row.updated_at = now;
+    state.repo.upsert_provider(&row).await
+        .map_err(|e| format!("upsert_provider: {e}"))?;
+
+    Ok((200, json!({
+        "id": id,
+        "updated": changed,
+        "enabled": row.enabled,
+        "default_model": row.default_model,
+        "base_url": row.base_url,
+    })))
+}
+
+/// GET /api/providers/{id}/models — fetch available models.
+/// Cached for 1 hour per provider id.
+async fn list_models(
+    body: Value,
+    state: Arc<ServerState>,
+) -> Result<(u16, Value), String> {
+    let id = body.get("id").and_then(|v| v.as_str())
+        .ok_or_else(|| "missing 'id' in path".to_string())?.to_string();
+
+    // Check cache first.
+    if let Ok(Some(cached)) = state.repo.get_model_cache(&id).await {
+        let now = chrono::Utc::now().timestamp();
+        if now - cached.fetched_at < 3600 {
+            let models: Vec<Value> = serde_json::from_str(&cached.models_json)
+                .unwrap_or_else(|_| Vec::new());
+            return Ok((200, json!({
+                "provider_id": id,
+                "models": models,
+                "cached": true,
+                "fetched_at": cached.fetched_at,
+            })));
+        }
+    }
+
+    // Resolve provider (preset or custom).
+    let (kind, base_url, has_live, default_model) = if let Some(preset) = crate::providers::get(&id) {
+        (preset.kind.to_string(), preset.base_url.to_string(),
+         preset.has_live_models_endpoint, preset.default_model.to_string())
+    } else {
+        // Look up custom_provider.
+        let custom = match state.repo.get_custom_provider(&id).await
+            .map_err(|e| format!("get_custom: {e}"))? {
+            Some(c) => c,
+            None => return Ok((404, json!({ "error": format!("unknown provider: {id}") }))),
+        };
+        (custom.kind.clone(), custom.base_url.clone(),
+         custom.kind == "openai-compatible",
+         custom.default_model.unwrap_or_default())
+    };
+
+    // Anthropic has no /v1/models endpoint — return the hard-coded
+    // fallback list directly.
+    if !has_live {
+        let models: Vec<Value> = crate::providers::ANTHROPIC_FALLBACK_MODELS.iter()
+            .map(|(id, label)| json!({
+                "id": id, "display_name": label, "source": "fallback",
+            }))
+            .collect();
+        let body_str = serde_json::to_string(&models).unwrap();
+        let _ = state.repo.put_model_cache(&storage::ModelCacheRow {
+            provider_id: id.clone(),
+            models_json: body_str,
+            fetched_at: chrono::Utc::now().timestamp(),
+        }).await;
+        return Ok((200, json!({
+            "provider_id": id,
+            "models": models,
+            "cached": false,
+            "fallback": true,
+        })));
+    }
+
+    // OpenAI-compatible fetch.
+    let url = format!("{}/models", base_url.trim_end_matches('/'));
+    let secret_name = if crate::providers::get(&id).is_some() {
+        crate::providers::get(&id).unwrap().secret_name.to_string()
+    } else {
+        format!("CUSTOM_PROVIDER_KEY_{id}")
+    };
+    let api_key = match state.secrets.reveal(&secret_name).await {
+        Ok(k) => k,
+        Err(crate::secrets::SecretStoreError::NotFound(_)) => {
+            return Ok((401, json!({
+                "error": "no API key configured",
+                "secret_name": secret_name,
+            })));
+        }
+        Err(e) => return Ok((500, json!({ "error": format!("reveal: {e}") }))),
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| format!("reqwest build: {e}"))?;
+    let resp = client.get(&url)
+        .header("Authorization", format!("Bearer {api_key}"))
+        .send()
+        .await
+        .map_err(|e| format!("GET {url}: {e}"))?;
+    let status = resp.status();
+    if !status.is_success() {
+        return Ok((status.as_u16(), json!({
+            "error": format!("provider returned {status}"),
+            "url": url,
+        })));
+    }
+    let body: Value = resp.json().await
+        .map_err(|e| format!("parse {url}: {e}"))?;
+    // OpenAI-compatible /models response shape:
+    // { "object": "list", "data": [{ id, object, ... }, ...] }
+    let models: Vec<Value> = body.get("data")
+        .and_then(|d| d.as_array())
+        .map(|arr| arr.iter().filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(|id| json!({
+            "id": id,
+            "display_name": id,
+            "source": "live",
+        }))).collect())
+        .unwrap_or_default();
+    let body_str = serde_json::to_string(&models).unwrap_or_default();
+    let _ = state.repo.put_model_cache(&storage::ModelCacheRow {
+        provider_id: id.clone(),
+        models_json: body_str,
+        fetched_at: chrono::Utc::now().timestamp(),
+    }).await;
+    Ok((200, json!({
+        "provider_id": id,
+        "models": models,
+        "cached": false,
+        "fallback": false,
+    })))
+}
+
+/// POST /api/providers/custom — add a relay-station / private-gateway
+/// provider. The api_key lives in the encrypted secret store under
+/// `CUSTOM_PROVIDER_KEY_<id>`.
+async fn add_custom_provider(
+    body: Value,
+    state: Arc<ServerState>,
+) -> Result<(u16, Value), String> {
+    let name = body.get("name").and_then(|v| v.as_str())
+        .ok_or_else(|| "missing 'name'".to_string())?.to_string();
+    let base_url = body.get("base_url").and_then(|v| v.as_str())
+        .ok_or_else(|| "missing 'base_url'".to_string())?.to_string();
+    let kind = body.get("kind").and_then(|v| v.as_str())
+        .unwrap_or("openai-compatible").to_string();
+    let default_model = body.get("default_model")
+        .and_then(|v| v.as_str()).map(|s| s.to_string());
+
+    if name.is_empty() || name.len() > 64 {
+        return Ok((400, json!({ "error": "name must be 1..=64 chars" })));
+    }
+    if !base_url.starts_with("https://") && !base_url.starts_with("http://") {
+        return Ok((400, json!({ "error": "base_url must start with http(s)://" })));
+    }
+    if kind != "openai-compatible" && kind != "anthropic-compatible" {
+        return Ok((400, json!({ "error": "kind must be openai-compatible or anthropic-compatible" })));
+    }
+
+    let id = ulid::Ulid::new().to_string();
+    let now = chrono::Utc::now().timestamp();
+    let row = storage::CustomProvider {
+        id: id.clone(),
+        name: name.clone(),
+        base_url: base_url.clone(),
+        kind: kind.clone(),
+        default_model: default_model.clone(),
+        enabled: true,
+        created_at: now,
+        updated_at: now,
+    };
+    state.repo.insert_custom_provider(&row).await
+        .map_err(|e| format!("insert_custom: {e}"))?;
+
+    // If an api_key was supplied in the same POST, encrypt and
+    // store it under CUSTOM_PROVIDER_KEY_<id>.
+    if let Some(key) = body.get("api_key").and_then(|v| v.as_str()) {
+        let secret_name = format!("CUSTOM_PROVIDER_KEY_{id}");
+        state.secrets.put(&secret_name, key).await
+            .map_err(|e| format!("put secret: {e}"))?;
+    }
+
+    Ok((201, json!({
+        "id": id,
+        "name": name,
+        "base_url": base_url,
+        "kind": kind,
+        "default_model": default_model,
+        "enabled": true,
+    })))
+}
+
+/// DELETE /api/providers/custom/{id} — remove a custom provider
+/// and any associated secret.
+async fn delete_custom_provider(
+    body: Value,
+    state: Arc<ServerState>,
+) -> Result<(u16, Value), String> {
+    let id = body.get("id").and_then(|v| v.as_str())
+        .ok_or_else(|| "missing 'id' in path".to_string())?.to_string();
+
+    let removed = state.repo.delete_custom_provider(&id).await
+        .map_err(|e| format!("delete_custom: {e}"))?;
+    // Best-effort: clean up the associated api_key secret.
+    let secret_name = format!("CUSTOM_PROVIDER_KEY_{id}");
+    let _ = state.secrets.delete(&secret_name).await;
+    Ok((200, json!({
+        "id": id,
+        "deleted": removed,
+    })))
 }
 
 async fn run_task(body: Value, state: Arc<ServerState>) -> Result<(u16, Value), String> {
