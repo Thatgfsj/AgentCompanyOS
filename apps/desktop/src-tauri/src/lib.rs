@@ -9,17 +9,25 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use tauri::Manager;
 use tauri::Emitter;
 use tauri_plugin_shell::ShellExt;
+use tauri_core::logging::{self, LoggingGuard};
 use tauri_core::{start_workflow, AppState, NewWorkflowRequest, NewWorkflowResponse};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::windows::named_pipe::ClientOptions;
 
 const RPC_PIPE: &str = r"\\.\pipe\flowntier_runtime";
 const EVENTS_PIPE: &str = r"\\.\pipe\flowntier_runtime_events";
+
+/// Process-wide logging guard. Stored in a OnceLock so the panic
+/// hook installed by `logging::init_logging` survives for the
+/// lifetime of the process — the guard's Drop impl flushes + joins
+/// the background writer thread, so we must hold onto it.
+static LOGGING_GUARD: OnceLock<LoggingGuard> = OnceLock::new();
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 const MAX_LINE: usize = 1_048_576; // 1 MiB hard cap per pipe message
@@ -261,6 +269,30 @@ async fn run_agent_task(body: serde_json::Value) -> Result<serde_json::Value, St
 #[tauri::command]
 async fn draw_i_ching() -> Result<serde_json::Value, String> {
     pipe_request("POST", "/api/i_ching/draw", None).await
+}
+
+/// Write a frontend error to the Rust log file.
+///
+/// Called from `apps/desktop/src/components/ErrorBoundary.tsx` when
+/// the React tree throws. Best-effort: failures are logged but
+/// never thrown back to the JS side (that would deadlock the
+/// error UI).
+#[tauri::command]
+async fn log_frontend_error(
+    message: String,
+    stack: String,
+    component_stack: String,
+) -> Result<(), String> {
+    tracing::error!(
+        target: "frontend",
+        component_stack = component_stack,
+        "React uncaught error: {message}"
+    );
+    // Write the stack at debug level so the file includes it but
+    // it doesn't show up in stderr (dev) by default. Users can
+    // grep the log file directly.
+    tracing::debug!(target: "frontend.stack", "{stack}");
+    Ok(())
 }
 
 #[tauri::command]
@@ -512,8 +544,23 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let handle = app.handle().clone();
+
+            // Bring up logging FIRST so every subsequent log line
+            // (including the panic hook) lands in the file. We need
+            // a data_dir to know where to write — derive it the
+            // same way AppState::build does.
+            if let Some(data_dir) = storage::Repository::default_data_dir() {
+                let _ = std::fs::create_dir_all(&data_dir);
+                let _ = LOGGING_GUARD.set(logging::init_logging(&data_dir));
+            } else {
+                eprintln!(
+                    "[flowntier] cannot determine data_dir; logs will only go to stderr"
+                );
+            }
+
             tauri::async_runtime::block_on(async move {
                 spawn_runtime_sidecar(&handle);
                 match AppState::build().await {
@@ -521,7 +568,34 @@ pub fn run() {
                         handle.manage(state);
                     }
                     Err(e) => {
+                        // Show a native error dialog so the user
+                        // gets a clear message instead of a silent
+                        // process exit. The dialog plugin handles
+                        // Windows MessageBox / macOS NSAlert /
+                        // Linux GTK dialog automatically.
+                        tracing::error!("failed to build AppState: {e}");
                         eprintln!("[flowntier] failed to build AppState: {}", e);
+
+                        let log_path = storage::Repository::default_data_dir()
+                            .map(|d| d.join("logs").display().to_string())
+                            .unwrap_or_else(|| "(unavailable)".into());
+                        let body = format!(
+                            "Flowntier failed to start:\n\n{e}\n\nDiagnostic logs:\n{log_path}\n\n\
+                             Please open a bug report at:\n  https://github.com/Thatgfsj/Flowntier/issues\n\n\
+                             (Click OK to close.)"
+                        );
+
+                        // tauri-plugin-dialog's message() is async;
+                        // we block on it inside the async setup so
+                        // the user sees the dialog before exit.
+                        use tauri_plugin_dialog::DialogExt;
+                        let _ = handle
+                            .dialog()
+                            .message(body)
+                            .title("Flowntier — startup failed")
+                            .kind(tauri_plugin_dialog::MessageDialogKind::Error)
+                            .blocking_show();
+
                         std::process::exit(1);
                     }
                 }
@@ -537,6 +611,8 @@ pub fn run() {
             add_custom_provider, remove_custom_provider,
             start_workflow_cmd, get_workflow, cancel_workflow,
             run_agent_task,
+            draw_i_ching,
+            log_frontend_error,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
