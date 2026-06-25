@@ -9,13 +9,11 @@ description = "Tauri app entry, commands, and glue for Flowntier"
 [lints.clippy]
 all = { level = "deny", priority = -1 }
 
-# Binary name was renamed from `aco` to `flowntier` in the
-# 2026-06-24 rebrand; the source file is kept as `aco.rs` to
-# preserve git rename detection, so we bind the artifact name
-# explicitly here.
+# Binary name: `flowntier` (renamed from `aco` in the 2026-06-24
+# rebrand). Source file lives at src/bin/flowntier.rs.
 [[bin]]
 name = "flowntier"
-path = "src/bin/aco.rs"
+path = "src/bin/flowntier.rs"
 
 [features]
 default = ["custom-protocol"]

@@ -1,4 +1,4 @@
-//! Typed event bus for ACO.
+//! Typed event bus for Flowntier.
 //!
 //! Carries `WfEvent` between the Rust core, the Tauri webview, and the
 //! Python runtime. This is the **only** IPC channel the runtime is

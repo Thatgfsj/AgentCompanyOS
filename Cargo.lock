@@ -10,7 +10,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "agent-core"
-version = "0.2.5"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -552,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.2.5"
+version = "0.4.0"
 dependencies = [
  "dirs 5.0.1",
  "insta",
@@ -1123,7 +1123,7 @@ dependencies = [
 
 [[package]]
 name = "event-bus"
-version = "0.2.5"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1203,7 +1203,7 @@ dependencies = [
 
 [[package]]
 name = "flowntier-desktop"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "config",
  "event-bus",
@@ -3017,7 +3017,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pipe-server"
-version = "0.2.5"
+version = "0.4.0"
 dependencies = [
  "agent-core",
  "anyhow",
@@ -4324,7 +4324,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "storage"
-version = "0.2.5"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4610,7 +4610,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-core"
-version = "0.2.5"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "chrono",

@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest a new capability.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve? What can you not do today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Sketch of how Flowntier should behave. UI mockups, API shapes, anything concrete.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else did you look at? Why is this better?
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and risks
+      description: |
+        Which Flowntier component(s) does this touch?
+        Could it break existing workflows / saved secrets / installed plugins?
+        Backward-compat strategy?
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Importance to you
+      options:
+        - "Nice to have"
+        - "Important — blocks my daily use"
+        - "Critical — I'll switch tools without this"
+    validations:
+      required: true

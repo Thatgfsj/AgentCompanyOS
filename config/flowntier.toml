@@ -1,12 +1,17 @@
-# aco.toml — top-level runtime config for Agent Company OS.
-# See docs/CONFIG.md §3 for the full schema.
+# flowntier.toml — top-level runtime config for Flowntier.
+# See docs/CONFIG.md §3 for the full schema (will be added in v0.4.1).
 #
-# This file is the **default**. Override per-project in `.aco/config.yaml`
-# or per-user in `~/.config/aco/config.toml`. See docs/CONFIG.md §2
-# for the hierarchy.
+# This file is the **checked-in default**. The desktop Tauri shell
+# constructs AcoConfig in code from this file's values at build time;
+# runtime overrides live in the user data directory:
+#   Windows : %APPDATA%\flowntier\flowntier.toml
+#   macOS   : ~/Library/Application Support/flowntier/flowntier.toml
+#   Linux   : ~/.config/flowntier/flowntier.toml
 
 [app]
-data_dir    = "~/.config/aco"
+# data_dir is read from the OS-default at runtime; setting it here
+# only affects the standalone `flowntier` CLI.
+# data_dir    = "%APPDATA%/flowntier"
 log_level   = "info"
 theme       = "dark"
 auto_update = false
@@ -35,7 +40,7 @@ sample_events  = 0.1
 [storage]
 retention_usage_days   = 365
 retention_prompts_days = 180
-backup_dir             = "~/.config/aco/backups"
+backup_dir             = "%APPDATA%/flowntier/backups"
 backup_daily_keep      = 7
 backup_weekly_keep     = 4
 

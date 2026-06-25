@@ -1,15 +1,15 @@
-# Contributing to Agent Company OS
+# Contributing to Flowntier
 
 > Thanks for being here. Please read this before opening an issue or PR.
 
-**Version:** v0.1
-**Last updated:** 2026-06-18
+**Version:** v0.4
+**Last updated:** 2026-06-24
 
 ---
 
 ## TL;DR
 
-* ACO is **RFC-driven**. Non-trivial changes start with a discussion
+* Flowntier is **RFC-driven**. Non-trivial changes start with a discussion
   → RFC draft → merge → implement.
 * Small fixes (typos, clear bugs) can go straight to a PR.
 * All commits must follow [`.agent/commit_rules.md`](./.agent/commit_rules.md).
@@ -22,7 +22,7 @@
 
 ## How decisions are made
 
-ACO follows the **RFC process** borrowed from projects like Rust,
+Flowntier follows the **RFC process** borrowed from projects like Rust,
 React, and Vue. The lifecycle:
 
 ```
@@ -70,19 +70,19 @@ cd Flowntier
 # Install everything
 pnpm install            # TypeScript
 cargo build             # Rust
-uv sync                 # Python (uses uv; pip works too)
 
 # Run the dev shell
-make dev                # tauri dev + python sidecar
+make dev                # tauri dev + rust sidecar
 
 # Run all tests
-make test               # cargo test + pytest + pnpm test
+make test               # cargo test + pnpm test
+make e2e                # PowerShell end-to-end against built runtime
 
 # Lint
 make lint
 ```
 
-See the README's "Quickstart" section for the full flow.
+See the README's "Build from source" section for the full flow.
 
 ---
 
@@ -114,7 +114,6 @@ See the README's "Quickstart" section for the full flow.
 ## Coding style (recap)
 
 * Rust: `rustfmt` + `clippy -D warnings` + `cargo test`
-* Python: `black` + `ruff check` + `mypy --strict` + `pytest`
 * TypeScript: `prettier` + `eslint` + `tsc --noEmit` + `vitest`
 * Markdown: `prettier`
 
@@ -139,7 +138,7 @@ All commits must be GPG/SSH signed. See
 ## Security
 
 **Do not** file public issues for security vulnerabilities. Email
-`security@aco.local` (TBD). See
+`security@flowntier.dev` (TBD). See
 [`docs/SECURITY.md` §9](./docs/SECURITY.md#9-reporting-a-vulnerability).
 
 ---

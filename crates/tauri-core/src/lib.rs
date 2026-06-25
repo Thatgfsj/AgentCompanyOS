@@ -28,7 +28,7 @@ impl AppState {
     /// Build a fresh app state. Used by `main.rs` and tests.
     pub async fn build() -> Result<Self, BuildError> {
         // Defaults suitable for development; production reads
-        // `aco.toml` from the OS-specific config dir.
+        // `flowntier.toml` from the OS-specific config dir.
         let data_dir = storage::Repository::default_data_dir()
             .ok_or_else(|| BuildError::NoDataDir)?;
         std::fs::create_dir_all(&data_dir)?;

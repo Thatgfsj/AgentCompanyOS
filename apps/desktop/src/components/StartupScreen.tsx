@@ -5,7 +5,7 @@
  * Uses a ref to avoid re-triggering the effect on callback identity changes.
  *
  * v0.2.5+: the health check goes through Tauri `invoke('health_check')`
- * which talks to the Python sidecar over the `\\.\pipe\aco_runtime`
+ * which talks to the Rust runtime over the `\\.\pipe\flowntier_runtime`
  * named pipe. No browser fetch, no port 7317.
  */
 
@@ -71,7 +71,7 @@ export function StartupScreen({ onReady }: StartupScreenProps) {
   return (
     <div className="flex h-screen items-center justify-center bg-surface-1">
       <div className="flex flex-col items-center gap-6">
-        <div className="text-4xl font-bold text-primary">Agent Company OS</div>
+        <div className="text-4xl font-bold text-primary">Flowntier</div>
         <div className="text-sm text-text-secondary">AI 软件公司操作系统</div>
 
         <div className="mt-4 flex flex-col items-center gap-3">

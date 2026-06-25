@@ -1,4 +1,4 @@
-//! Embedded agent core for Agent Company OS (v0.3+).
+//! Embedded agent core for Flowntier (v0.3+).
 //!
 //! This crate replaces the previous two-sidecar architecture
 //! (Python FastAPI runtime + Claude Code CLI over portable-pty)
@@ -18,7 +18,7 @@
 //!   placeholder-substitution template engine.
 //! - [`context`] — token counting + truncation + summarization.
 //! - [`event`] — the `AgentEvent` enum (text delta, tool started,
-//!   tool finished, file diff, etc.) that the rest of ACO
+//!   tool finished, file diff, etc.) that the rest of Flowntier
 //!   subscribes to.
 //!
 //! ## What does NOT live here

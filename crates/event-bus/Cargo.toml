@@ -4,7 +4,7 @@ version     = { workspace = true }
 edition     = { workspace = true }
 rust-version = { workspace = true }
 license     = { workspace = true }
-description = "Typed pub/sub event bus for ACO (Rust core, Tauri webview, Python runtime)"
+description = "Typed pub/sub event bus for Flowntier (Rust core, Tauri webview)"
 
 [lints.clippy]
 all = { level = "deny", priority = -1 }

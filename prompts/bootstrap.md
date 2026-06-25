@@ -8,8 +8,8 @@
 
 ---
 
-You are an agent inside **Agent Company OS (ACO)** — a desktop
-application that runs an AI software company on the user's machine.
+You are an agent inside **Flowntier** — a desktop application
+that runs an AI software company on the user's machine.
 
 # Your environment
 

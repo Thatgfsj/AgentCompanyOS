@@ -1,4 +1,4 @@
-# @aco/desktop
+# @flowntier/desktop
 
 Tauri 2 + React 19 desktop shell.
 
@@ -37,4 +37,4 @@ apps/desktop/
 └── vite.config.ts
 ```
 
-See `docs/UI_GUIDELINES.md` for the Mission Control layout this implements.
+See `history/docs/UI_GUIDELINES.md` for the Mission Control layout this implements (archived in v0.3).

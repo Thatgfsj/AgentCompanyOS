@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card } from '@aco/ui';
+import { Card } from '@flowntier/ui';
 import {
   saveSecret,
   listProviders, toggleProvider,

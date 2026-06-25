@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card } from '@aco/ui';
+import { Card } from '@flowntier/ui';
 import { listPlugins, invokePlugin, type PluginDescriptor } from '../lib/api.js';
 
 interface PluginResult {
