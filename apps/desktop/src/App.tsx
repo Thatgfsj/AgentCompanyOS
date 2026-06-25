@@ -5,6 +5,7 @@ import { Welcome } from './components/Welcome';
 import { PhaseTimeline, AgentCard, Card, type PhaseState, type AgentStatus } from '@flowntier/ui';
 import type { WfEvent } from '@flowntier/shared';
 import { TopBar } from './zones/TopBar.js';
+import { CenterPanel } from './zones/CenterPanel.js';
 import { LeftRoster } from './zones/LeftRoster.js';
 import { RightPanel } from './zones/RightPanel.js';
 import { BottomConsole } from './zones/BottomConsole.js';
@@ -523,32 +524,67 @@ export function App() {
             </Card>
           )}
 
-          <AgentCard
-            role="chief"
-            name="主理"
-            status={agentStatusToRole(agentStatus.chief)}
-            subtitle={
-              agentStatus.chief === 'thinking'
-                ? '沉稳的策略师 · 正在分析'
-                : agentStatus.chief === 'speaking'
-                  ? '沉稳的策略师 · 正在汇报'
-                  : '沉稳的策略师 · 待命'
+          {/* CenterPanel: empty-state vs live chief+reviewer. */}
+          <CenterPanel
+            hasActiveWorkflow={busy || milestones.length > 0 || currentWfId !== null}
+            onTrySample={
+              busy || milestones.length > 0 || currentWfId !== null
+                ? undefined
+                : async () => {
+                    try {
+                      const wf = await invoke<{
+                        user_request: string;
+                        display_name: string;
+                      }>('load_sample_workflow');
+                      await invoke('start_workflow', {
+                        request: { text: wf.user_request },
+                      });
+                    } catch (e) {
+                      console.warn('[App] onTrySample failed:', e);
+                    }
+                  }
             }
-            progress={busy ? 0.5 : undefined}
-          />
+            chiefCard={
+              <>
+                <AgentCard
+                  role="chief"
+                  name="主理"
+                  status={agentStatusToRole(agentStatus.chief)}
+                  subtitle={
+                    agentStatus.chief === 'thinking'
+                      ? '沉稳的策略师 · 正在分析'
+                      : agentStatus.chief === 'speaking'
+                        ? '沉稳的策略师 · 正在汇报'
+                        : '沉稳的策略师 · 待命'
+                  }
+                  progress={busy ? 0.5 : undefined}
+                />
 
-          <ReasoningBubble
-            agentName="主理"
-            roleColorClass="border-t-chief"
-            step={`阶段 ${activePhase + 1} / 8`}
-            body={
-              completed
-                ? '工作流已完成。请查看右侧交付摘要。'
-                : busy
-                  ? '正在协调团队执行用户指令…'
-                  : '等待用户在下方的命令栏输入指令。'
+                <ReasoningBubble
+                  agentName="主理"
+                  roleColorClass="border-t-chief"
+                  step={`阶段 ${activePhase + 1} / 8`}
+                  body={
+                    completed
+                      ? '工作流已完成。请查看右侧交付摘要。'
+                      : busy
+                        ? '正在执行当前阶段…（完整规划在左侧 8 阶段时间线上）'
+                        : '等待用户在下方的命令栏输入指令。'
+                  }
+                  ago={busy ? '正在运行' : '空闲'}
+                />
+
+                <Card>
+                  <h3 className="mb-2 text-sm font-semibold">审核员 B — 架构审查</h3>
+                  <ReviewVerdict
+                    verdict="PASS"
+                    confidence={0.87}
+                    issues={[]}
+                    summary="模块边界清晰，鉴权模块与路由处理器解耦，结构良好。"
+                  />
+                </Card>
+              </>
             }
-            ago={busy ? '刚刚' : '待命中'}
           />
 
           {reviewVerdict !== null && (
