@@ -72,6 +72,33 @@ export function TopBar({
       >
         设置
       </button>
+      <LanguageToggle />
     </header>
+  );
+}
+
+/**
+ * Tiny two-state language toggle. Cycles between zh-CN and en-US.
+ * Persists to localStorage via i18n.on('languageChanged').
+ */
+import { useTranslation } from 'react-i18next';
+import { SUPPORTED } from '../i18n/index.js';
+
+function LanguageToggle() {
+  const { i18n } = useTranslation();
+  const current = i18n.language?.startsWith('en') ? 'en-US' : 'zh-CN';
+  const next = current === 'zh-CN' ? 'en-US' : 'zh-CN';
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void i18n.changeLanguage(next);
+      }}
+      title={`Switch to ${SUPPORTED.find((l) => l === next)}`}
+      className="rounded-md border border-border bg-surface-1 px-2 py-1 text-xs text-text-secondary transition-colors hover:text-primary focus:outline-none focus:ring-2 focus:ring-chief/50"
+      aria-label={`Language: ${current}`}
+    >
+      🌐 {current === 'zh-CN' ? '中文' : 'EN'}
+    </button>
   );
 }

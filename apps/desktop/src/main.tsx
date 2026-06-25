@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { appVersion, buildSha } from './lib/version.js';
+import './i18n/index.js';
 import './index.css';
 
 const queryClient = new QueryClient({

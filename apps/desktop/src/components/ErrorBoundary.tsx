@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import i18n from '../i18n/index.js';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
 
@@ -187,12 +188,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     const { appVersion, buildSha } = this.props;
     const message = this.state.error.message ?? '(unknown)';
+    // t() is bound at render time; safe in class components because
+    // we re-read i18n.language on every render (which happens when
+    // i18n emits a 'languageChanged' event and React re-renders).
+    const t = i18n.t.bind(i18n);
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center bg-surface-1 px-6 text-text-primary">
         <div className="max-w-2xl space-y-6">
           <div>
             <h1 className="text-3xl font-semibold text-error">
-              出错了 v{appVersion}
+              {t('error.title', { version: appVersion })}
               {buildSha && (
                 <span className="ml-2 text-sm font-normal text-text-secondary">
                   · Build {buildSha}
@@ -200,16 +205,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               )}
             </h1>
             <p className="mt-2 text-sm text-text-secondary">
-              应用遇到了一个未捕获的错误。下面的信息可以帮助排查问题。
+              {t('error.subtitle')}
             </p>
           </div>
 
           <div className="rounded-md border border-border bg-surface-2 p-4 font-mono text-xs">
-            <div className="text-text-secondary">错误消息</div>
+            <div className="text-text-secondary">{t('error.message')}</div>
             <div className="mt-1 break-words text-error">{message}</div>
             {this.state.componentStack && (
               <>
-                <div className="mt-3 text-text-secondary">组件堆栈</div>
+                <div className="mt-3 text-text-secondary">{t('error.componentStack')}</div>
                 <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-text-secondary">
                   {this.state.componentStack}
                 </pre>
@@ -223,30 +228,28 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               onClick={() => void this.copyLogs()}
               className="rounded-md border border-border bg-surface-2 px-4 py-2 text-sm hover:bg-surface-3 focus:outline-none focus:ring-2 focus:ring-accent/50"
             >
-              📋 复制日志
+              {t('error.action.copyLogs')}
             </button>
             <button
               type="button"
               onClick={this.restart}
               className="rounded-md border border-border bg-surface-2 px-4 py-2 text-sm hover:bg-surface-3 focus:outline-none focus:ring-2 focus:ring-accent/50"
             >
-              🔄 重启应用
+              {t('error.action.restart')}
             </button>
             <button
               type="button"
               onClick={() => void this.report()}
               className="rounded-md border border-accent bg-accent/10 px-4 py-2 text-sm text-accent hover:bg-accent/20 focus:outline-none focus:ring-2 focus:ring-accent/50"
             >
-              🐛 上报问题
+              {t('error.action.report')}
             </button>
           </div>
 
           <p className="text-xs text-text-secondary">
-            日志同时写入本地文件{' '}
-            <code className="rounded bg-surface-3 px-1 py-0.5">
-              %APPDATA%/flowntier/logs/
-            </code>
-            ，可以随附在上报的问题里。
+            {t('error.logLocation', {
+              path: '%APPDATA%/flowntier/logs/',
+            })}
           </p>
         </div>
       </div>
