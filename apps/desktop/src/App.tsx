@@ -653,8 +653,12 @@ export function App() {
                         user_request: string;
                         display_name: string;
                       }>('load_sample_workflow');
-                      await invoke('start_workflow', {
-                        request: { text: wf.user_request },
+                      // BUG-022 fix (event 000020): the command name
+                      // is `start_workflow_cmd`, not `start_workflow`,
+                      // and the args are flat `{ text }` not wrapped
+                      // in `{ request: { text } }` (per lib.rs:539).
+                      await invoke('start_workflow_cmd', {
+                        text: wf.user_request,
                       });
                     } catch (e) {
                       console.warn('[App] onTrySample failed:', e);

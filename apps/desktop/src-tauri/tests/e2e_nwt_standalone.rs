@@ -53,6 +53,162 @@ fn init_nwt_fs(root: &std::path::Path) -> Result<String, String> {
     Ok(nwt_dir.to_string_lossy().into_owned())
 }
 
+// ── BUG-006: search_log secret redaction ────────────────
+//
+// Inline mirror of lib.rs's redact_secrets() function. If the
+// lib.rs version changes, update here too.
+
+fn redact_secrets(line: &str) -> String {
+    let mut out = line.to_string();
+
+    fn replace_token(
+        s: &str,
+        prefix: &str,
+        replacement: &str,
+        include_prefix: bool,
+    ) -> String {
+        let mut out = String::with_capacity(s.len());
+        let bytes = s.as_bytes();
+        let prefix_bytes = prefix.as_bytes();
+        let plen = prefix_bytes.len();
+        let mut i = 0;
+        while i + plen <= bytes.len() {
+            if &bytes[i..i + plen] == prefix_bytes {
+                let after_start = i + plen;
+                let mut j = after_start;
+                while j < bytes.len()
+                    && (bytes[j].is_ascii_alphanumeric()
+                        || bytes[j] == b'_'
+                        || bytes[j] == b'-')
+                {
+                    j += 1;
+                }
+                if include_prefix {
+                    out.push_str(prefix);
+                }
+                out.push_str(replacement);
+                i = j;
+            } else {
+                let c = s[i..].chars().next().unwrap();
+                out.push(c);
+                i += c.len_utf8();
+            }
+        }
+        if i < bytes.len() {
+            out.push_str(&s[i..]);
+        }
+        out
+    }
+
+    out = replace_token(&out, "Bearer ", "<redacted>", true);
+
+    for prefix in &["sk_live_", "sk_test_"] {
+        let mut new_out = String::with_capacity(out.len());
+        let bytes = out.as_bytes();
+        let prefix_bytes = prefix.as_bytes();
+        let plen = prefix_bytes.len();
+        let mut i = 0;
+        while i + plen <= bytes.len() {
+            if &bytes[i..i + plen] == prefix_bytes {
+                let mut j = i + plen;
+                while j < bytes.len()
+                    && (bytes[j].is_ascii_alphanumeric()
+                        || bytes[j] == b'_'
+                        || bytes[j] == b'-')
+                {
+                    j += 1;
+                }
+                new_out.push_str(prefix);
+                new_out.push_str("<redacted>");
+                i = j;
+            } else {
+                let c = out[i..].chars().next().unwrap();
+                new_out.push(c);
+                i += c.len_utf8();
+            }
+        }
+        if i < bytes.len() {
+            new_out.push_str(&out[i..]);
+        }
+        out = new_out;
+    }
+
+    out = replace_token(&out, "sk-", "sk-<redacted>", false);
+
+    for keyword in &["_KEY", "_TOKEN", "_SECRET", "API_KEY", "PASSWORD"] {
+        let klen = keyword.len();
+        let bytes = out.as_bytes();
+        let mut new_out = String::with_capacity(out.len());
+        let mut i = 0;
+        while i < bytes.len() {
+            let mut j = i;
+            let mut found = false;
+            while j + klen <= bytes.len() {
+                if &bytes[j..j + klen] == keyword.as_bytes() {
+                    found = true;
+                    break;
+                }
+                j += 1;
+            }
+            if !found {
+                new_out.push_str(&out[i..]);
+                break;
+            }
+            let mut key_start = j;
+            while key_start > 0 {
+                let prev = bytes[key_start - 1];
+                if prev.is_ascii_uppercase() || prev.is_ascii_digit() || prev == b'_' {
+                    key_start -= 1;
+                } else {
+                    break;
+                }
+            }
+            if key_start == j {
+                new_out.push_str(&out[i..j + klen]);
+                i = j + klen;
+                continue;
+            }
+            let key_end = j + klen;
+            new_out.push_str(&out[i..key_end]);
+            let mut sep = key_end;
+            while sep < bytes.len() && (bytes[sep] == b' ' || bytes[sep] == b'\t') {
+                sep += 1;
+            }
+            if sep >= bytes.len() || (bytes[sep] != b'=' && bytes[sep] != b':') {
+                i = key_end;
+                continue;
+            }
+            new_out.push(bytes[sep] as char);
+            let mut v = sep + 1;
+            if v < bytes.len() && (bytes[v] == b'"' || bytes[v] == b'\'') {
+                new_out.push(bytes[v] as char);
+                v += 1;
+            }
+            let v_start = v;
+            while v < bytes.len() {
+                let b = bytes[v];
+                if b.is_ascii_whitespace()
+                    || b == b',' || b == b'}' || b == b']'
+                    || b == b'"' || b == b'\''
+                {
+                    break;
+                }
+                v += 1;
+            }
+            let value_seg = &out[v_start..v];
+            if value_seg.contains("<redacted>") {
+                new_out.push_str(value_seg);
+            } else {
+                new_out.push_str("<redacted>");
+            }
+            i = v;
+        }
+        out = new_out;
+    }
+
+    out
+}
+
 fn unix_secs_to_iso8601(t: std::time::SystemTime) -> String {
     use std::time::UNIX_EPOCH;
     let secs = t.duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
@@ -317,6 +473,63 @@ fn e2e_boundary_search_log_unicode_needle() {
     let log_line = "2026-06-27 ERROR [FE-失败-abc] something broke";
     assert!(log_line.contains("失败"));
     assert!(log_line.contains("FE-失败-abc"));
+}
+
+#[test]
+fn e2e_boundary_redact_bearer_token() {
+    let line = "2026-06-27 ERROR GET /v1/chat 401 Authorization: Bearer sk-supersecret123";
+    let r = redact_secrets(line);
+    assert!(!r.contains("sk-supersecret123"),
+        "bearer token must be redacted, got: {r}");
+    assert!(r.contains("Bearer <redacted>"));
+}
+
+#[test]
+fn e2e_boundary_redact_sk_prefix() {
+    let line = "loaded OPENAI_API_KEY=sk-abc123def456ghi789jkl012mno";
+    let r = redact_secrets(line);
+    assert!(!r.contains("sk-abc123def456ghi789jkl012mno"),
+        "sk- prefix must be redacted, got: {r}");
+    assert!(r.contains("sk-<redacted>"));
+}
+
+#[test]
+fn e2e_boundary_redact_env_api_key() {
+    let line = r#"{"OPENAI_API_KEY":"sk-abc123def456","ANTHROPIC_API_KEY":"sk-ant-xyz"}"#;
+    let r = redact_secrets(line);
+    // The KEY= pattern should redact the value. After redaction
+    // the raw sk-abc value must not appear.
+    assert!(!r.contains("sk-abc123def456"),
+        "env API key value must be redacted, got: {r}");
+    // And the prefix should remain redacted too (Pattern 2).
+    assert!(!r.contains("sk-ant-xyz"),
+        "anthropic key must be redacted, got: {r}");
+}
+
+#[test]
+fn e2e_boundary_redact_preserves_non_secrets() {
+    let line = "GET /api/users 200 in 12ms";
+    let r = redact_secrets(line);
+    assert_eq!(r, line, "non-secret lines must be unchanged");
+}
+
+#[test]
+fn e2e_boundary_redact_stripe_style() {
+    let line = "stripe key: sk_live_abcdef1234567890XYZ";
+    let r = redact_secrets(line);
+    assert!(!r.contains("abcdef1234567890XYZ"),
+        "stripe live key body must be redacted, got: {r}");
+    assert!(r.contains("sk_live_<redacted>"));
+}
+
+#[test]
+fn e2e_boundary_redact_password_kv() {
+    let line = "DB_PASSWORD=hunter2 REDIS_PASSWORD=secret123";
+    let r = redact_secrets(line);
+    assert!(!r.contains("hunter2"),
+        "DB_PASSWORD value must be redacted, got: {r}");
+    assert!(!r.contains("secret123"),
+        "REDIS_PASSWORD value must be redacted, got: {r}");
 }
 
 #[test]

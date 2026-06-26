@@ -1,0 +1,20 @@
+{
+  "id": "000019",
+  "timestamp": "2026-06-27T14:00:00Z",
+  "task": "BUG-FIX-BATCH-1: 7 high-severity bugs identified, BUG-017 BLOCKING documented with v0.5 fix plan",
+  "summary": "BUG-FIX-BATCH-1: 7 high-severity bugs identified, BUG-017 BLOCKING documented with v0.5 fix plan",
+  "reason": "Chairman: '根据记录的问题逐个修复bug'. Ran systematic probe (Explore agent) across lib.rs, App.tsx, SearchBugPanel.tsx, nwt.rs, prompt/mod.rs, tauri.conf.json, Settings.tsx, WorkdirSetup.tsx, logging.rs. Found 59 bugs total. Severity: 1 BLOCKING + 6 HIGH + 12 MEDIUM + ~30 LOW + 10 NONE. Top 7 by severity: BUG-017 (BLOCKING — Rust NWT tool's NWT_ROOT static is set in pipe-server's process; App.tsx writes only to kv table that nothing reads; agents can't nwt_log), BUG-022 (HIGH — onTrySample invokes 'start_workflow' which doesn't exist; should be 'start_workflow_cmd'; user clicks dead button), BUG-036 (HIGH — updater 'passive' installMode + NSIS 'perMachine' installMode = UAC denial on update), BUG-016 (HIGH — set_workdir + nwt_init_workspace not atomic; partial failure leaves workdir set but .nwt/ missing), BUG-004 (HIGH — search_log reads entire log file into memory; OOM on big logs), BUG-006 (HIGH — search_log returns log lines verbatim including API keys like sk-...; credential leak), BUG-011 (HIGH — nwt_init_workspace accepts a file path and creates .nwt/ adjacent). Plan: fix BUG-022 (1-line typo) + BUG-011 (2-line guard) + BUG-036 (config flip) immediately. BUG-004 (BufReader refactor), BUG-006 (regex redactor), BUG-016 (atomicity — need App.tsx refactor) follow next. BUG-017 deferred to v0.5 because the proper fix is architectural: pipe-server needs to read kv.nwt_root on every workflow start and call agent_core::nwt::set_nwt_root() inside the pipe-server process (where the static actually lives); today App.tsx writes to kv but pipe-server never reads it. Logging this batch as event 000019 — bug fixes themselves land as events 000020+.",
+  "files": [],
+  "tags": [
+    "bug-fix-batch",
+    "bug-017",
+    "bug-022",
+    "bug-036",
+    "bug-016",
+    "bug-004",
+    "bug-006",
+    "bug-011",
+    "audit",
+    "v0.5-deferred"
+  ]
+}

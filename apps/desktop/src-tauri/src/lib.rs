@@ -567,6 +567,220 @@ async fn cancel_workflow(id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Redact common API-key / token shapes from a log line before
+/// it leaves the Tauri boundary. BUG-006 fix.
+///
+/// Handles 4 substring patterns:
+///
+///   1. `Bearer …` — Authorization header value in HTTP logs.
+///   2. `sk-…` — OpenAI / Anthropic / DeepSeek key prefixes.
+///   3. `sk_live_…` / `sk_test_…` — Stripe-style keys.
+///   4. `KEY=value` for `*_KEY`, `*_TOKEN`, `*_SECRET`, `API_KEY`,
+///      `PASSWORD` (uppercase keys; common env-var serialisation).
+///
+/// Implementation note: we use stdlib only (no regex dep). For
+/// v0.5+, switch to the `regex` crate — these hand-rolled
+/// scanners are correct for the tested inputs but conservative
+/// about edge cases (e.g. values with embedded `=`).
+fn redact_secrets(line: &str) -> String {
+    let mut out = line.to_string();
+
+    // Helper: replace all occurrences of `prefix` followed by
+    // alphanumeric/_/- chars with `replacement` (no recursion —
+    // each match is replaced independently).
+    fn replace_token(
+        s: &str,
+        prefix: &str,
+        replacement: &str,
+        include_prefix: bool,
+    ) -> String {
+        let mut out = String::with_capacity(s.len());
+        let bytes = s.as_bytes();
+        let prefix_bytes = prefix.as_bytes();
+        let plen = prefix_bytes.len();
+        let mut i = 0;
+        while i + plen <= bytes.len() {
+            if &bytes[i..i + plen] == prefix_bytes {
+                let after_start = i + plen;
+                if include_prefix {
+                    // Copy the prefix verbatim, then replace the
+                    // value chars that follow.
+                    let mut j = after_start;
+                    while j < bytes.len()
+                        && (bytes[j].is_ascii_alphanumeric()
+                            || bytes[j] == b'_'
+                            || bytes[j] == b'-')
+                    {
+                        j += 1;
+                    }
+                    out.push_str(prefix);
+                    out.push_str(replacement);
+                    i = j;
+                } else {
+                    // Don't copy the prefix; replace it AND the
+                    // value chars that follow.
+                    let mut j = after_start;
+                    while j < bytes.len()
+                        && (bytes[j].is_ascii_alphanumeric()
+                            || bytes[j] == b'_'
+                            || bytes[j] == b'-')
+                    {
+                        j += 1;
+                    }
+                    out.push_str(replacement);
+                    i = j;
+                }
+            } else {
+                // Copy one char (UTF-8 safe via char_indices).
+                let c = s[i..].chars().next().unwrap();
+                out.push(c);
+                i += c.len_utf8();
+            }
+        }
+        // Copy any trailing bytes we missed (shouldn't happen with
+        // ASCII-only inputs but be safe).
+        if i < bytes.len() {
+            out.push_str(&s[i..]);
+        }
+        out
+    }
+
+    // Pattern 1: Bearer
+    out = replace_token(&out, "Bearer ", "<redacted>", true);
+
+    // Pattern 3 first (more specific): sk_live_/sk_test_ must run
+    // BEFORE Pattern 2 so the longer prefix wins. We replace the
+    // whole "sk_live_xxx" with "sk_live_<redacted>".
+    for prefix in &["sk_live_", "sk_test_"] {
+        // Manually: copy prefix, then run Pattern 2 logic on the
+        // value chars that follow.
+        let mut new_out = String::with_capacity(out.len());
+        let bytes = out.as_bytes();
+        let prefix_bytes = prefix.as_bytes();
+        let plen = prefix_bytes.len();
+        let mut i = 0;
+        while i + plen <= bytes.len() {
+            if &bytes[i..i + plen] == prefix_bytes {
+                let mut j = i + plen;
+                while j < bytes.len()
+                    && (bytes[j].is_ascii_alphanumeric()
+                        || bytes[j] == b'_'
+                        || bytes[j] == b'-')
+                {
+                    j += 1;
+                }
+                new_out.push_str(prefix);
+                new_out.push_str("<redacted>");
+                i = j;
+            } else {
+                let c = out[i..].chars().next().unwrap();
+                new_out.push(c);
+                i += c.len_utf8();
+            }
+        }
+        if i < bytes.len() {
+            new_out.push_str(&out[i..]);
+        }
+        out = new_out;
+    }
+
+    // Pattern 2: sk- (any alphanumeric/-/_ after)
+    out = replace_token(&out, "sk-", "sk-<redacted>", false);
+
+    // Pattern 4: KEY=value for env-var-shaped secrets. We do a
+    // single forward pass, looking for any of the keyword suffixes
+    // preceded by uppercase letters/digits/_, followed by `=` or
+    // `:` and a value. When found, replace the value with
+    // `<redacted>`. Skip if the value already contains `<redacted>`
+    // (Pattern 2/3 handled it).
+    for keyword in &["_KEY", "_TOKEN", "_SECRET", "API_KEY", "PASSWORD"] {
+        let klen = keyword.len();
+        let bytes = out.as_bytes();
+        let mut new_out = String::with_capacity(out.len());
+        let mut i = 0;
+        while i < bytes.len() {
+            // Find the next occurrence of `keyword` starting at i.
+            let mut j = i;
+            let mut found = false;
+            while j + klen <= bytes.len() {
+                if &bytes[j..j + klen] == keyword.as_bytes() {
+                    found = true;
+                    break;
+                }
+                j += 1;
+            }
+            if !found {
+                new_out.push_str(&out[i..]);
+                break;
+            }
+            // Walk backwards from j to find key start.
+            let mut key_start = j;
+            while key_start > 0 {
+                let prev = bytes[key_start - 1];
+                if prev.is_ascii_uppercase() || prev.is_ascii_digit() || prev == b'_' {
+                    key_start -= 1;
+                } else {
+                    break;
+                }
+            }
+            // Need at least one char before the keyword.
+            if key_start == j {
+                // Skip past this keyword occurrence.
+                new_out.push_str(&out[i..j + klen]);
+                i = j + klen;
+                continue;
+            }
+            // Copy everything from i up to key_end verbatim.
+            let key_end = j + klen;
+            new_out.push_str(&out[i..key_end]);
+            // Skip whitespace, expect `=` or `:`.
+            let mut sep = key_end;
+            while sep < bytes.len()
+                && (bytes[sep] == b' ' || bytes[sep] == b'\t')
+            {
+                sep += 1;
+            }
+            if sep >= bytes.len()
+                || (bytes[sep] != b'=' && bytes[sep] != b':')
+            {
+                // No separator; skip past this keyword.
+                i = key_end;
+                continue;
+            }
+            new_out.push(bytes[sep] as char);
+            let mut v = sep + 1;
+            // Optional opening quote.
+            if v < bytes.len() && (bytes[v] == b'"' || bytes[v] == b'\'') {
+                new_out.push(bytes[v] as char);
+                v += 1;
+            }
+            let v_start = v;
+            while v < bytes.len() {
+                let b = bytes[v];
+                if b.is_ascii_whitespace()
+                    || b == b',' || b == b'}' || b == b']'
+                    || b == b'"' || b == b'\''
+                {
+                    break;
+                }
+                v += 1;
+            }
+            // Check if already redacted.
+            let value_seg = &out[v_start..v];
+            if value_seg.contains("<redacted>") {
+                // Already handled — copy value verbatim.
+                new_out.push_str(value_seg);
+            } else {
+                new_out.push_str("<redacted>");
+            }
+            i = v;
+        }
+        out = new_out;
+    }
+
+    out
+}
+
 /// Search the daily-rolling log file for lines containing the
 /// given error code (e.g. "FE-3a7b9c2d"). Settings → About →
 /// "Search my bug" panel calls this; the user pastes the code
@@ -646,7 +860,16 @@ fn search_log(code: String, since: Option<String>) -> Result<serde_json::Value, 
         for line in text.lines() {
             scanned += 1;
             if line.contains(needle) {
-                matches.push(line.to_string());
+                // BUG-006 fix (event 000020): redact API keys, bearer
+                // tokens, and similar secrets before returning the
+                // line. The user might paste an error code from the
+                // ErrorBoundary, but the matched log line could
+                // contain `OPENAI_API_KEY=sk-…` or an Authorization
+                // header — sending that back to the webview exposes
+                // the secret (and the user can copy it from the
+                // modal). The redactor runs per-line, so non-secret
+                // context is preserved.
+                matches.push(redact_secrets(line));
                 if matches.len() >= MAX_MATCHES {
                     truncated = true;
                     break 'outer;
@@ -803,6 +1026,17 @@ fn nwt_init_workspace(path: String) -> Result<String, String> {
     let root = std::path::PathBuf::from(&path);
     if !root.exists() {
         return Err(format!("workdir does not exist: {}", path));
+    }
+    // BUG-011 fix (event 000020): the user might accidentally pick
+    // an existing file (e.g. resume.docx) as their workdir. Without
+    // this guard, `create_dir_all` happily creates <file>/.nwt/ next
+    // to the original file, polluting Documents/. We require an
+    // actual directory.
+    if !root.is_dir() {
+        return Err(format!(
+            "workdir is not a directory: {}",
+            root.display()
+        ));
     }
     let nwt_dir = root.join(".nwt");
     std::fs::create_dir_all(nwt_dir.join("timeline"))

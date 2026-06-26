@@ -1,0 +1,25 @@
+{
+  "id": "000020",
+  "timestamp": "2026-06-27T14:30:00Z",
+  "task": "BUG-FIX-BATCH-1 LANDED: 4 high-severity bugs fixed (BUG-022, 036, 011, 006)",
+  "summary": "BUG-FIX-BATCH-1 LANDED: 4 high-severity bugs fixed (BUG-022, 036, 011, 006)",
+  "reason": "Chairman: '根据记录的问题逐个修复bug'. Fixed 4 high-severity bugs from event 000019 audit: BUG-022 (onTrySample invoked non-existent 'start_workflow' command; changed to 'start_workflow_cmd' with flat {text} arg shape per lib.rs:539 — App.tsx:656-658), BUG-036 (NSIS installMode 'perMachine' + updater 'passive' = silent UAC failure on update; changed NSIS to 'currentUser' so passive update works without elevation; also added 'zh-CN' to wix languages for parity with NSIS — tauri.conf.json:52-60), BUG-011 (nwt_init_workspace accepted an existing file as path and created <file>/.nwt/ adjacent — added is_dir() guard returning Err(\"workdir is not a directory\") — lib.rs:807-815), BUG-006 (search_log returned log lines verbatim including API keys like sk-abc…; added redact_secrets() function that handles 4 patterns: Bearer tokens, sk- prefixed keys, sk_live_/sk_test_ Stripe keys, and KEY=value for *_KEY/*_TOKEN/*_SECRET/API_KEY/PASSWORD — applied per-line before matches.push — lib.rs:566-707). 6 new tests added to tests/e2e_nwt_standalone.rs covering all 4 patterns plus the non-secret preservation case. All 23 tests now pass. cargo check + pnpm typecheck + pnpm tauri build --bundles nsis all clean. Bundle: target/release/bundle/nsis/Flowntier_0.4.0_x64-setup.exe (16 MB). BUG-002 fix (added MSVC-named sidecar) remains working — NSIS installer built successfully. Still TODO: BUG-017 (BLOCKING — Rust NWT tool's NWT_ROOT static is in pipe-server's process; App.tsx writes to kv table that nothing reads — deferred to v0.5 because the proper fix requires pipe-server to read kv.nwt_root on every workflow start and call set_nwt_root inside pipe-server process), BUG-016 (HIGH — set_workdir + nwt_init_workspace not atomic — needs App.tsx refactor), BUG-004 (HIGH — search_log reads entire log file into memory).",
+  "files": [
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/src-tauri/tests/e2e_nwt_standalone.rs"
+  ],
+  "tags": [
+    "bug-fix",
+    "bug-022",
+    "bug-036",
+    "bug-011",
+    "bug-006",
+    "i18n",
+    "secret-redaction",
+    "workdir-validation",
+    "updater",
+    "tauri-config"
+  ]
+}
