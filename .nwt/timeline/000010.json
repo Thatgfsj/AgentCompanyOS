@@ -1,0 +1,32 @@
+{
+  "id": "000010",
+  "timestamp": "2026-06-26T10:23:18Z",
+  "task": "Polish 1-12: 12-PR polish cycle complete (i18n + a11y + error code + uninstall + history + lint)",
+  "summary": "Polish 1-12: 12-PR polish cycle complete (i18n + a11y + error code + uninstall + history + lint)",
+  "reason": "Chairman: '补大量打磨, 逐个完成'. 12 PRs (#10-#21) over ~6 hours. Highlights: 90+ new i18n keys, WCAG 2.1 AA a11y (role=alert/aria-live/aria-modal), stable FE-xxxxxxxx error code, Settings > About > Clear local data (wipe_all_data Tauri command), CommandDock recent-commands history (HTML5 datalist + localStorage), missing_docs sweep (38 warnings -> 0), tErr() helper for catch-block error fallbacks. v0.4.0-rc2 tag pushed (472f542); chairman smoke-test on Win/Linux VMs next.",
+  "files": [
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts",
+    "apps/desktop/src/zones/Settings.tsx",
+    "apps/desktop/src/zones/TopBar.tsx",
+    "apps/desktop/src/zones/CenterPanel.tsx",
+    "apps/desktop/src/components/Welcome.tsx",
+    "apps/desktop/src/components/ErrorBoundary.tsx",
+    "apps/desktop/src/lib/errs.ts",
+    "apps/desktop/src/lib/api.ts",
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/zones/CommandDock.tsx",
+    "apps/desktop/src-tauri/src/lib.rs",
+    "crates/storage/src/lib.rs",
+    "crates/agent-core/src/lib.rs",
+    ".nwt/timeline/"
+  ],
+  "tags": [
+    "polish-1-12",
+    "external-release",
+    "quality",
+    "i18n",
+    "a11y",
+    "perf"
+  ]
+}

@@ -41,10 +41,12 @@
   "apps/desktop/src-tauri/src/lib.rs": [
     "000002",
     "000003",
-    "000006"
+    "000006",
+    "000010"
   ],
   "apps/desktop/src/components/ErrorBoundary.tsx": [
-    "000003"
+    "000003",
+    "000010"
   ],
   "apps/desktop/src/i18n/{index": [
     "000003"
@@ -85,25 +87,30 @@
     "000004"
   ],
   "crates/storage/src/lib.rs": [
-    "000004"
+    "000004",
+    "000010"
   ],
   "apps/desktop/src/components/Welcome.tsx": [
     "000005",
-    "000007"
+    "000007",
+    "000010"
   ],
   "apps/desktop/src/zones/CenterPanel.tsx": [
-    "000005"
+    "000005",
+    "000010"
   ],
   "apps/desktop/src/App.tsx": [
     "000005",
     "000006",
-    "000007"
+    "000007",
+    "000010"
   ],
   "apps/desktop/src/i18n/{zh-CN": [
     "000007"
   ],
   "apps/desktop/src/lib/api.ts": [
-    "000007"
+    "000007",
+    "000010"
   ],
   "apps/desktop/src/zones/{TopBar": [
     "000007"
@@ -130,6 +137,28 @@
     "000009"
   ],
   ".nwt/timeline/": [
-    "000009"
+    "000009",
+    "000010"
+  ],
+  "apps/desktop/src/i18n/zh-CN.ts": [
+    "000010"
+  ],
+  "apps/desktop/src/i18n/en-US.ts": [
+    "000010"
+  ],
+  "apps/desktop/src/zones/Settings.tsx": [
+    "000010"
+  ],
+  "apps/desktop/src/zones/TopBar.tsx": [
+    "000010"
+  ],
+  "apps/desktop/src/lib/errs.ts": [
+    "000010"
+  ],
+  "apps/desktop/src/zones/CommandDock.tsx": [
+    "000010"
+  ],
+  "crates/agent-core/src/lib.rs": [
+    "000010"
   ]
 }
