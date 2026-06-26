@@ -43,7 +43,8 @@
     "000003",
     "000006",
     "000010",
-    "000013"
+    "000013",
+    "000015"
   ],
   "apps/desktop/src/components/ErrorBoundary.tsx": [
     "000003",
@@ -51,6 +52,15 @@
   ],
   "apps/desktop/src/components/SearchBugPanel.tsx": [
     "000013"
+  ],
+  "apps/desktop/src/components/WorkdirSetup.tsx": [
+    "000015"
+  ],
+  "apps/desktop/src/tools/nwt.ts": [
+    "000015"
+  ],
+  "crates/agent-core/src/tool/nwt.rs": [
+    "000015"
   ],
   "apps/desktop/src/i18n/{index": [
     "000003"
@@ -110,7 +120,8 @@
     "000006",
     "000007",
     "000010",
-    "000011"
+    "000011",
+    "000015"
   ],
   "apps/desktop/src/i18n/{zh-CN": [
     "000007"
@@ -152,14 +163,16 @@
     "000011",
     "000012",
     "000013",
-    "000014"
+    "000014",
+    "000015"
   ],
   "apps/desktop/src/i18n/en-US.ts": [
     "000010",
     "000011",
     "000012",
     "000013",
-    "000014"
+    "000014",
+    "000015"
   ],
   "apps/desktop/src/zones/Settings.tsx": [
     "000010",
@@ -190,7 +203,8 @@
     "000011"
   ],
   "crates/agent-core/src/prompt/mod.rs": [
-    "000011"
+    "000011",
+    "000015"
   ],
   "apps/desktop/src/components/PerTaskConsole.tsx": [
     "000014"

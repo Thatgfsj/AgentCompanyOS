@@ -1,0 +1,27 @@
+{
+  "id": "000015",
+  "timestamp": "2026-06-27T12:00:00Z",
+  "task": "Polish 16: NWT embedding — merge nwt/embed-v1 into main",
+  "summary": "Polish 16: NWT embedding — merge nwt/embed-v1 into main",
+  "reason": "Chairman: 'OK 批准改动, 合并吧, 完成之后构建应用, 然后自己跑个端对端测试, 简单中等困难, 并且摸清边界情况, 并且及时记录bug, 回头统一修理'. Merged 6 NWT embedding commits (adad6fa..b819a2d on nwt/embed-v1) into main as 2bcf032. Resolved 5 conflicts: i18n keys (combined Polish 14-prime 64 keys + 12 workdir keys), generate_handler! registration (search_log + get_workdir/set_workdir), NWT_INSTRUCTION duplicate (embed-v1 had two copies), raw string `\"` escape fix (switched r\"...\" to r#\"...\"#), #[cfg(test)] lost during dedup, every_prompt_has_nwt_section duplicate test. Verification: pnpm typecheck clean, cargo check --workspace clean, cargo test --workspace --lib all pass. NWT is now first-class: WorkdirSetup on first launch → per-workflow .nwt/ init → all 6 roles get NWT_INSTRUCTION in system prompt → agents auto-call nwt_log on milestones.",
+  "files": [
+    "apps/desktop/package.json",
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/components/WorkdirSetup.tsx",
+    "apps/desktop/src/i18n/en-US.ts",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/tools/nwt.ts",
+    "crates/agent-core/src/prompt/mod.rs",
+    "crates/agent-core/src/tool/nwt.rs",
+    "pnpm-lock.yaml"
+  ],
+  "tags": [
+    "polish-16",
+    "nwt",
+    "embedding",
+    "merge",
+    "workdir",
+    "system-prompt"
+  ]
+}
