@@ -753,7 +753,7 @@ async fn get_workdir() -> Result<Option<String>, String> {
 ///
 /// Returns `"1970-01-01T00:00:00Z"` if `t` predates the unix
 /// epoch (vanishingly unlikely but Rust's `SystemTime` allows it).
-fn unix_secs_to_iso8601(t: std::time::SystemTime) -> String {
+pub fn unix_secs_to_iso8601(t: std::time::SystemTime) -> String {
     use std::time::UNIX_EPOCH;
     let secs = t.duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let (year, month, day) = civil_from_days((secs / 86_400) as i64);
@@ -770,7 +770,7 @@ fn unix_secs_to_iso8601(t: std::time::SystemTime) -> String {
 /// Howard Hinnant's `civil_from_days` (inverse of
 /// `days_from_civil`). Given days since 1970-01-01, returns
 /// (year, month, day). See http://howardhinnant.github.io/date_algorithms.html
-fn civil_from_days(z: i64) -> (i32, u32, u32) {
+pub fn civil_from_days(z: i64) -> (i32, u32, u32) {
     let z = z + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = (z - era * 146_097) as u32; // [0, 146096]
