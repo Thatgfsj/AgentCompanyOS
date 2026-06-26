@@ -1,0 +1,21 @@
+{
+  "id": "000021",
+  "timestamp": "2026-06-27T15:00:00Z",
+  "task": "E2E re-run after bug-batch-1: 23/23 desktop E2E + 121/121 workspace",
+  "summary": "E2E re-run after bug-batch-1: 23/23 desktop E2E + 121/121 workspace",
+  "reason": "Chairman: '修复完成了吗, 那继续跑一下端到端（简单/中等/困难/边界）, 并且详细记录'. After landing bug-batch-1 (commit 83ed330 — fixes for BUG-022 onTrySample, BUG-036 NSIS installMode, BUG-011 nwt_init is_dir guard, BUG-006 search_log secret redaction), ran the full test matrix and recorded per-tier results. Tier breakdown: SIMPLE (4): e2e_simple_init_creates_skeleton, e2e_simple_init_is_idempotent, e2e_simple_civil_from_days_known_dates, e2e_simple_unix_secs_format. MEDIUM (2): e2e_medium_workdir_roundtrip, e2e_medium_nwt_indices_dirs_exist. HARD (2): e2e_hard_six_events_in_timeline, e2e_hard_max_id_scan. BOUNDARY (15): empty_timeline_reads_zero, metadata_json_written_once, nested_nwt_in_nwt, spaces_in_workdir, unicode_workdir, search_log_special_chars (regex/JSON special chars), search_log_unicode_needle (CJK), search_log_cap_at_200 (truncated flag), search_log_panic_files_excluded, redact_bearer_token (BUG-006), redact_sk_prefix (BUG-006), redact_env_api_key (BUG-006), redact_stripe_style (BUG-006 sk_live_), redact_password_kv (BUG-006 DB_PASSWORD), redact_preserves_non_secrets. ALL 23 PASS in 0.23s. Workspace test counts: storage 55, pipe-server 20, e2e_nwt_standalone 23, agent-core 8, pipe-server protocol 5, jsonrpc 6, event-bus 2, tauri-core 1, config 1, total = 121 passed, 0 failed, 1 ignored. pnpm typecheck: clean. cargo check --workspace: clean. NSIS bundle still builds: Flowntier_0.4.0_x64-setup.exe (16 MB). Bug-batch-1 fix verification: the 6 redact_* tests would all FAIL on the old code (no redactor existed), confirming BUG-006 is genuinely fixed. The onTrySample fix (BUG-022) and BUG-036 / BUG-011 fixes are not directly testable from the lib level since they live in App.tsx / tauri.conf.json — but cargo check + pnpm typecheck + tauri build all pass, confirming no regression.",
+  "files": [
+    "apps/desktop/src-tauri/tests/e2e_nwt_standalone.rs",
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src/App.tsx"
+  ],
+  "tags": [
+    "e2e",
+    "test",
+    "polish-16",
+    "bug-fix-verification",
+    "redaction",
+    "nwt",
+    "workspace-tests"
+  ]
+}
