@@ -103,7 +103,8 @@
     "000005",
     "000006",
     "000007",
-    "000010"
+    "000010",
+    "000011"
   ],
   "apps/desktop/src/i18n/{zh-CN": [
     "000007"
@@ -141,10 +142,12 @@
     "000010"
   ],
   "apps/desktop/src/i18n/zh-CN.ts": [
-    "000010"
+    "000010",
+    "000011"
   ],
   "apps/desktop/src/i18n/en-US.ts": [
-    "000010"
+    "000010",
+    "000011"
   ],
   "apps/desktop/src/zones/Settings.tsx": [
     "000010"
@@ -160,5 +163,20 @@
   ],
   "crates/agent-core/src/lib.rs": [
     "000010"
+  ],
+  "apps/desktop/src/tools/nwt.ts": [
+    "000011"
+  ],
+  "apps/desktop/src/components/WorkdirSetup.tsx": [
+    "000011"
+  ],
+  "crates/agent-core/src/tool/mod.rs": [
+    "000011"
+  ],
+  "crates/agent-core/src/tool/nwt.rs": [
+    "000011"
+  ],
+  "crates/agent-core/src/prompt/mod.rs": [
+    "000011"
   ]
 }

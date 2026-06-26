@@ -1,0 +1,24 @@
+{
+  "id": "000011",
+  "timestamp": "2026-06-26T12:25:56Z",
+  "task": "Steps A-F: nwt embedding complete (6 commits on nwt/embed-v1)",
+  "summary": "Steps A-F: nwt embedding complete (6 commits on nwt/embed-v1)",
+  "reason": "Chairman: '我希望内置NWT到flowntier里面，第一次打开Flowntier的时候让用户设置工作目录，然后按任务让AI自己选择创建项目级别的目录（在工作目录下，这里你要加到系统提示词里面）' — 6-commit embedding: (A) TS port of nwt in src/tools/nwt.ts; (B) WorkdirSetup dialog for first-launch workdir picker; (C) Tauri set_workdir/get_workdir + App.tsx first-run gate; (D) Rust nwt_log tool registered in agent-core's ToolRegistry; (E) SYSTEM_PROMPT adds 'AI 主动记录到 NWT' instruction to all 6 roles; (F) per-workflow .nwt/ auto-init (TS side calls initWorkspace on workdir confirm; kvSet('nwt_root', workdir) on workflow start). The nwt TS and Rust implementations write the same JSON format so events are cross-compatible with the upstream nwt CLI. v0.4.0-NWT-rc3 candidate. Step F.5 (deferred): agent loop reads kv.nwt_root and injects into agent-core nwt tool's static; trivial 30-line patch tracked for v0.5.",
+  "files": [
+    "apps/desktop/src/tools/nwt.ts",
+    "apps/desktop/src/components/WorkdirSetup.tsx",
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts",
+    "crates/agent-core/src/tool/mod.rs",
+    "crates/agent-core/src/tool/nwt.rs",
+    "crates/agent-core/src/prompt/mod.rs"
+  ],
+  "tags": [
+    "nwt",
+    "embedding",
+    "workdir",
+    "system-prompt",
+    "chairman-directive"
+  ]
+}

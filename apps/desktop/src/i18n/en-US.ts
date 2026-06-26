@@ -201,6 +201,35 @@ const enUS: Translations = {
   'settings.models.modelExists': 'Model {{id}} already exists',
   'settings.error.customAdd': 'Add custom relay station',
   'settings.error.alreadyAdded': 'Already added',
+  // ── Polish 14: Welcome + CenterPanel + PerTaskConsole ─
+  'welcome.progress.providers': 'Add AI provider',
+  'welcome.progress.sample': 'Sample workflow',
+  'welcome.progress.enter': 'Start working',
+  'welcome.step1.title': 'Step 1 — Add an AI provider',
+  'welcome.step1.subtitle': 'First launch needs at least one API key. Add one now, or skip and add later in Settings.',
+  'welcome.step1.loadingProviders': 'Loading providers…',
+  'welcome.step1.skipLabel': 'Skip this step',
+  'welcome.step1.providersEmpty': 'No providers available. Check that the sidecar is running.',
+  'welcome.step2.title': 'Step 2 — Try the sample workflow',
+  'welcome.step2.subtitle': 'A real workflow that runs through Chief → Planner → Worker → Review → Reporter.',
+  'welcome.step2.loadingSample': 'Loading sample workflow…',
+  'welcome.step2.skipLabel': 'Skip — go to the dashboard',
+  'welcome.step2.selectedCount': 'Selected:',
+  'welcome.step3.title': 'Step 3 — Enter the dashboard',
+  'welcome.step3.subtitle': 'Ready. Add more providers or custom relay stations any time from Settings.',
+  'welcome.step3.confirmLabel': 'Enter the dashboard →',
+  'welcome.error.copyPasteHint': '_Use the "Copy logs" button on the error screen, then paste here._',
+
+  // CenterPanel empty state
+  'centerPanel.emptyTitle': 'No workflow yet',
+  'centerPanel.exampleAddTests': 'Add unit tests to the project',
+  'centerPanel.exampleAuth': 'Implement POST /auth/login endpoint',
+  'centerPanel.exampleRefactor': 'Refactor src/components/Sidebar.tsx',
+  'centerPanel.orTrySample': 'Or try the sample workflow →',
+
+  // PerTaskConsole
+  'perTask.filter': 'Filter:',
+  'perTask.task': 'task',
   // ── Drift banner (Phase 5) ───────────────────────────
   'drift.message':
     '⚠ Sidecar runtime version (v{{sidecar}}) is older than the shell expects (v{{expected}}). Some features may be unavailable. Please rebuild the sidecar.',

@@ -199,6 +199,35 @@ const zhCN = {
   'settings.models.modelExists': '模型 {{id}} 已存在',
   'settings.error.customAdd': '添加自定义中转站',
   'settings.error.alreadyAdded': '已添加',
+  // ── Polish 14: Welcome + CenterPanel + PerTaskConsole ─
+  'welcome.progress.providers': '添加供应商',
+  'welcome.progress.sample': '示例任务',
+  'welcome.progress.enter': '开始使用',
+  'welcome.step1.title': '第 1 步 — 添加一个 AI 供应商',
+  'welcome.step1.subtitle': '首次使用需要至少一个 API Key。可以现在添加，也可以稍后到设置中添加。',
+  'welcome.step1.loadingProviders': '加载供应商列表…',
+  'welcome.step1.skipLabel': '跳过此步',
+  'welcome.step1.providersEmpty': '没有可用的供应商。请检查 sidecar 是否运行。',
+  'welcome.step2.title': '第 2 步 — 试试示例任务',
+  'welcome.step2.subtitle': '下面是一个真实的工作流示例，会走完 首席 → 规划 → 工匠 → 审查 → 汇报 五个角色。',
+  'welcome.step2.loadingSample': '加载示例任务…',
+  'welcome.step2.skipLabel': '跳过，先到工作台',
+  'welcome.step2.selectedCount': '已选:',
+  'welcome.step3.title': '第 3 步 — 进入工作台',
+  'welcome.step3.subtitle': '准备好了。可以随时到设置中添加更多供应商或自定义路由站。',
+  'welcome.step3.confirmLabel': '进入工作台 →',
+  'welcome.error.copyPasteHint': '_Use the "复制日志" button on the error screen, then paste here._',
+
+  // CenterPanel empty state
+  'centerPanel.emptyTitle': '还没有工作流',
+  'centerPanel.exampleAddTests': '给项目加单元测试',
+  'centerPanel.exampleAuth': '实现 POST /auth/login 接口',
+  'centerPanel.exampleRefactor': '重构 src/components/Sidebar.tsx',
+  'centerPanel.orTrySample': '或试试示例任务 →',
+
+  // PerTaskConsole
+  'perTask.filter': '过滤:',
+  'perTask.task': '任务',
   // ── Drift banner (Phase 5) ───────────────────────────
   'drift.message':
     '⚠ Sidecar 运行时版本 (v{{sidecar}}) 低于 shell 期望 (v{{expected}}). 某些功能可能不可用。请重新构建 sidecar。',
