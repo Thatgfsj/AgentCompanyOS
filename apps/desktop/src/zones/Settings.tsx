@@ -80,7 +80,7 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
         className="flex w-full items-center justify-center gap-2 rounded-lg border border-chief/30 bg-chief/10 px-4 py-2.5 text-sm font-medium text-chief transition-colors hover:bg-chief/20"
       >
         <span className="text-lg">+</span>
-        添加 AI 供应商
+        {t('settings.providers.addAI')}
       </button>
     );
   }
@@ -151,9 +151,19 @@ interface RuntimeSnapshot {
 
 const EMPTY: RuntimeSnapshot = { providers: [], roles: [], available_models: [] };
 
-const ROLE_LABELS: Record<string, string> = {
-  chief: '主理', critic_a: '审核员 A', critic_b: '审核员 B', worker: '实施', reporter: '汇报',
+// ROLE_LABELS is module-scope (no React hook access). Use
+// getRoleLabel(t, role) below to look up the localized string.
+const ROLE_KEYS: Record<string, string> = {
+  chief: 'settings.roles.chief',
+  critic_a: 'settings.roles.criticA',
+  critic_b: 'settings.roles.criticB',
+  worker: 'settings.roles.worker',
+  reporter: 'settings.roles.reporter',
 };
+function getRoleLabel(t: (k: string) => string, role: string): string {
+  const key = ROLE_KEYS[role];
+  return key ? t(key) : role;
+}
 
 export interface SettingsProps {
   open: boolean;
@@ -386,7 +396,7 @@ export function Settings({ open, onClose }: SettingsProps) {
                       <Field label={t('settings.custom.kindLabel')}>{sel.kind}</Field>
                       <Field label={t('settings.custom.baseUrlLabel')}><code className="font-mono">{sel.base_url}</code></Field>
                       <Field label={t('settings.custom.apiKeyLabel')}><code className="font-mono">{sel.api_key_env}</code></Field>
-                      <Field label="Key 已配置">
+                      <Field label={t('settings.field.keyConfigured')}>
                         {sel.key_present ? (
                           <span className="text-status-done">✓ 是</span>
                         ) : (
@@ -613,7 +623,7 @@ function RoleAssignmentCard({
     <Card className="!p-3">
       <div className="flex items-center gap-3">
         <div className="w-20 shrink-0">
-          <div className="text-sm font-medium">{ROLE_LABELS[role.role] ?? role.role}</div>
+          <div className="text-sm font-medium">{getRoleLabel(t, role.role)}</div>
           <div className="font-mono text-[10px] text-text-secondary">{role.role}</div>
         </div>
         <div className="flex-1">
@@ -806,7 +816,7 @@ function ProviderModelManager({
     <div className="mt-3 rounded-md border border-border bg-surface-2 p-3">
       <div className="mb-2 flex items-center justify-between">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          自选模型（{customModels.length}）
+          {t('settings.models.customModels', {count: customModels.length})}
         </h4>
         <button
           type="button"
@@ -864,7 +874,7 @@ function ProviderModelManager({
           >
             <header className="flex items-center justify-between border-b border-border px-4 py-3">
               <h3 className="text-sm font-semibold">
-                拉取 {providerDisplay} 模型
+                {t('settings.models.pullTitle', {provider: providerDisplay})}
               </h3>
               <button
                 type="button"
@@ -899,7 +909,7 @@ function ProviderModelManager({
                       onClick={() => setPicked(new Set(fetched.map((m) => m.id)))}
                       className="text-[11px] text-chief hover:underline"
                     >
-                      全选
+                      {t('settings.models.all')}
                     </button>
                     <span className="text-text-secondary">·</span>
                     <button
@@ -907,10 +917,10 @@ function ProviderModelManager({
                       onClick={() => setPicked(new Set())}
                       className="text-[11px] text-text-secondary hover:underline"
                     >
-                      清空选择
+                      {t('settings.models.none')}
                     </button>
                     <span className="ml-auto text-[11px] text-text-secondary">
-                      已选 {picked.size} 个
+                      {t('settings.models.selectedCount', {count: picked.size})}
                     </span>
                   </div>
                   <ul className="grid grid-cols-2 gap-1 text-xs">
@@ -933,7 +943,7 @@ function ProviderModelManager({
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-primary" title={m.id}>
                               {m.display_name}
-                              {have && <span className="ml-1 text-[10px] text-status-done">✓已添加</span>}
+                              {have && <span className="ml-1 text-[10px] text-status-done">{t('settings.models.alreadyAdded')}</span>}
                             </div>
                             <div className="truncate text-[10px] text-text-secondary" title={m.id}>
                               {m.id}
@@ -962,7 +972,7 @@ function ProviderModelManager({
                 disabled={busy || picked.size === 0}
                 className="rounded-md bg-chief px-3 py-1.5 text-xs font-medium text-white hover:bg-chief/90 disabled:opacity-30"
               >
-                添加 {picked.size > 0 ? `${picked.size} 个` : ''}
+                {t('settings.models.addSelected', {count: picked.size})}
               </button>
             </footer>
           </div>
@@ -1004,7 +1014,7 @@ function CustomProviderForm({ onSaved }: { onSaved: () => void }) {
   const addModelRow = () => {
     const mid = newModelId.trim();
     if (!mid) return;
-    if (models.some((m) => m.id === mid)) { setError(`模型 ${mid} 已存在`); return; }
+    if (models.some((m) => m.id === mid)) { setError(t('settings.models.modelExists', { id: mid })); return; }
     setModels([...models, { id: mid, display_name: newModelName.trim() || mid }]);
     setNewModelId(''); setNewModelName(''); setError(null);
   };
@@ -1061,7 +1071,7 @@ function CustomProviderForm({ onSaved }: { onSaved: () => void }) {
         className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-text-secondary/30 bg-surface-1 px-4 py-2.5 text-sm text-text-secondary transition-colors hover:border-chief/40 hover:text-chief"
       >
         <span className="text-lg">＋</span>
-        添加自定义中转站
+        {t('settings.error.customAdd')}
       </button>
     );
   }
@@ -1130,7 +1140,7 @@ function CustomProviderForm({ onSaved }: { onSaved: () => void }) {
       </div>
 
       {error && <p role="alert" aria-live="polite" className="mt-2 text-[11px] text-red-400">{error}</p>}
-      {success && <p role="status" aria-live="polite" className="mt-2 text-[11px] text-status-done">✓ 添加成功</p>}
+      {success && <p role="status" aria-live="polite" className="mt-2 text-[11px] text-status-done">{t('settings.error.alreadyAdded')}</p>}
 
       <div className="mt-3 flex justify-end">
         <button

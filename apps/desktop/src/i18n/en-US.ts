@@ -186,6 +186,21 @@ const enUS: Translations = {
   'settings.error.deleteCustomFailed': 'Failed to delete relay station',
   'settings.error.deleteRole': 'Failed to delete role',
   'settings.error.tErr': 'Error: {{error}}',
+  // ── Polish 13: remaining strings ──────────────────
+  'settings.providers.addAI': 'Add AI provider',
+  'settings.roles.criticA': 'Critic A',
+  'settings.roles.criticB': 'Critic B',
+  'settings.field.keyConfigured': 'Key configured',
+  'settings.models.customModels': 'Custom models ({{count}})',
+  'settings.models.addSelected': 'Add {{count}}',
+  'settings.models.alreadyAdded': '✓ added',
+  'settings.models.all': 'Select all',
+  'settings.models.none': 'Clear selection',
+  'settings.models.selectedCount': '{{count}} selected',
+  'settings.models.pullTitle': 'Pull {{provider}} models',
+  'settings.models.modelExists': 'Model {{id}} already exists',
+  'settings.error.customAdd': 'Add custom relay station',
+  'settings.error.alreadyAdded': 'Already added',
   // ── Drift banner (Phase 5) ───────────────────────────
   'drift.message':
     '⚠ Sidecar runtime version (v{{sidecar}}) is older than the shell expects (v{{expected}}). Some features may be unavailable. Please rebuild the sidecar.',

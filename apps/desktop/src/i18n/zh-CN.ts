@@ -184,6 +184,21 @@ const zhCN = {
   'settings.error.deleteCustomFailed': '删除中转站失败',
   'settings.error.deleteRole': '删除角色失败',
   'settings.error.tErr': '错误：{{error}}',
+  // ── Polish 13: remaining strings ──────────────────
+  'settings.providers.addAI': '添加 AI 供应商',
+  'settings.roles.criticA': '审核员 A',
+  'settings.roles.criticB': '审核员 B',
+  'settings.field.keyConfigured': 'Key 已配置',
+  'settings.models.customModels': '自选模型（{{count}}）',
+  'settings.models.addSelected': '添加 {{count}} 个',
+  'settings.models.alreadyAdded': '✓已添加',
+  'settings.models.all': '全选',
+  'settings.models.none': '清空选择',
+  'settings.models.selectedCount': '已选 {{count}} 个',
+  'settings.models.pullTitle': '拉取 {{provider}} 模型',
+  'settings.models.modelExists': '模型 {{id}} 已存在',
+  'settings.error.customAdd': '添加自定义中转站',
+  'settings.error.alreadyAdded': '已添加',
   // ── Drift banner (Phase 5) ───────────────────────────
   'drift.message':
     '⚠ Sidecar 运行时版本 (v{{sidecar}}) 低于 shell 期望 (v{{expected}}). 某些功能可能不可用。请重新构建 sidecar。',
