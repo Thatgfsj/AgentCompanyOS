@@ -489,24 +489,18 @@ export function App() {
         initialPath=""
         mode="first-launch"
         onConfirm={async (p) => {
+          // BUG-016 fix (event 000022): we now use a SINGLE
+          // command `set_workdir_with_nwt` that atomically
+          // (a) initialises `.nwt/` in the workdir and
+          // (b) writes `workdir.json` to the app data dir.
+          // If either step fails, NEITHER is persisted — so the
+          // user sees the dialog again on next launch instead of
+          // a corrupt half-initialised workspace.
           try {
-            await invoke('set_workdir', { path: p });
+            await invoke('set_workdir_with_nwt', { path: p });
             setWorkdir(p);
-            // NWT Step F (Polish 16 fix for BUG-001): the TS
-            // initWorkspace() in tools/nwt.ts can't run in the
-            // webview (it imports node:fs/path). We replaced it
-            // with a Rust Tauri command (nwt_init_workspace) that
-            // creates the same .nwt/ skeleton. The Rust agent
-            // loop's nwt.rs reads from kv.nwt_root (set below in
-            // startRealWorkflow), so the two implementations stay
-            // in sync via the kv table.
-            try {
-              await invoke('nwt_init_workspace', { path: p });
-            } catch (e) {
-              console.warn('[App] nwt_init_workspace (Rust) failed:', e);
-            }
           } catch (e) {
-            console.error('[App] set_workdir failed:', e);
+            console.error('[App] set_workdir_with_nwt failed:', e);
           }
         }}
         onSkip={() => setWorkdir('')}

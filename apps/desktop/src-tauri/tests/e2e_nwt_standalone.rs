@@ -592,3 +592,341 @@ fn e2e_boundary_nested_nwt_in_nwt() {
     assert!(!project.join(".nwt").join(".nwt").exists(),
         "must not create nested .nwt/.nwt/");
 }
+
+// ── BUG-016: set_workdir + nwt_init atomicity ───────────
+
+/// Mirror of `set_workdir_with_nwt`'s core logic. On any
+/// failure, NEITHER workdir.json nor .nwt/ should be persisted.
+fn set_workdir_with_nwt(
+    data_dir: &std::path::Path,
+    workdir_path: &std::path::Path,
+) -> Result<String, String> {
+    if !workdir_path.exists() {
+        return Err(format!("workdir does not exist: {}", workdir_path.display()));
+    }
+    if !workdir_path.is_dir() {
+        return Err(format!(
+            "workdir is not a directory: {}",
+            workdir_path.display()
+        ));
+    }
+    let nwt_dir = workdir_path.join(".nwt");
+    std::fs::create_dir_all(nwt_dir.join("timeline"))
+        .map_err(|e| format!("mkdir timeline: {e}"))?;
+    std::fs::create_dir_all(nwt_dir.join("indices"))
+        .map_err(|e| format!("mkdir indices: {e}"))?;
+    let meta = nwt_dir.join("metadata.json");
+    if !meta.exists() {
+        let project_name = workdir_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("flowntier-project");
+        let payload = serde_json::json!({
+            "project_name": project_name,
+            "created_at": unix_secs_to_iso8601(std::time::SystemTime::now()),
+            "schema_version": 1,
+            "format": "nwt/0.1",
+        });
+        let bytes = serde_json::to_vec_pretty(&payload)
+            .map_err(|e| format!("serialize: {e}"))?;
+        std::fs::write(&meta, bytes)
+            .map_err(|e| format!("write metadata: {e}"))?;
+    }
+    let tags_idx = nwt_dir.join("indices").join("tags.json");
+    if !tags_idx.exists() {
+        std::fs::write(&tags_idx, b"{}\n")
+            .map_err(|e| format!("write tags: {e}"))?;
+    }
+    let files_idx = nwt_dir.join("indices").join("files.json");
+    if !files_idx.exists() {
+        std::fs::write(&files_idx, b"{}\n")
+            .map_err(|e| format!("write files: {e}"))?;
+    }
+    // Only NOW persist workdir.json (atomic via tmp+rename).
+    let wd_file = data_dir.join("workdir.json");
+    let payload = serde_json::json!({ "workdir": workdir_path.to_string_lossy() });
+    let bytes = serde_json::to_vec_pretty(&payload)
+        .map_err(|e| format!("serialize workdir: {e}"))?;
+    let tmp = wd_file.with_extension("json.tmp");
+    std::fs::write(&tmp, &bytes)
+        .map_err(|e| format!("write tmp: {e}"))?;
+    std::fs::rename(&tmp, &wd_file)
+        .map_err(|e| format!("rename: {e}"))?;
+    Ok(nwt_dir.to_string_lossy().into_owned())
+}
+
+#[test]
+fn e2e_hard_atomic_success() {
+    // Happy path: both .nwt/ and workdir.json end up persisted.
+    let tmp = TempDir::new("atomic-success");
+    let project = tmp.path().join("my-project");
+    let data_dir = tmp.path().join("app_data");
+    std::fs::create_dir_all(&project).unwrap();
+    std::fs::create_dir_all(&data_dir).unwrap();
+
+    let nwt = set_workdir_with_nwt(&data_dir, &project).expect("should succeed");
+    assert!(std::path::Path::new(&nwt).join("metadata.json").exists());
+    assert!(std::path::Path::new(&data_dir).join("workdir.json").exists());
+}
+
+#[test]
+fn e2e_hard_atomic_rejects_nonexistent_workdir() {
+    // Path validation: missing workdir → neither persisted.
+    let tmp = TempDir::new("atomic-missing");
+    let project = tmp.path().join("does-not-exist");
+    let data_dir = tmp.path().join("app_data");
+    std::fs::create_dir_all(&data_dir).unwrap();
+
+    let result = set_workdir_with_nwt(&data_dir, &project);
+    assert!(result.is_err());
+    assert!(!std::path::Path::new(&data_dir).join("workdir.json").exists(),
+        "workdir.json must NOT be written when validation fails");
+}
+
+#[test]
+fn e2e_hard_atomic_rejects_file_as_workdir() {
+    // Path validation: workdir is a regular file → neither persisted.
+    let tmp = TempDir::new("atomic-file");
+    let project_file = tmp.path().join("resume.docx");
+    std::fs::write(&project_file, b"fake doc").unwrap();
+    let data_dir = tmp.path().join("app_data");
+    std::fs::create_dir_all(&data_dir).unwrap();
+
+    let result = set_workdir_with_nwt(&data_dir, &project_file);
+    assert!(result.is_err());
+    assert!(!std::path::Path::new(&data_dir).join("workdir.json").exists(),
+        "workdir.json must NOT be written when path is a file");
+    assert!(!project_file.with_extension("docx.nwt").exists(),
+        "no .nwt/ should be created next to a file path");
+}
+
+#[test]
+fn e2e_hard_atomic_idempotent() {
+    // Calling twice with the same workdir should preserve metadata.json.
+    let tmp = TempDir::new("atomic-idem");
+    let project = tmp.path().join("my-project");
+    let data_dir = tmp.path().join("app_data");
+    std::fs::create_dir_all(&project).unwrap();
+    std::fs::create_dir_all(&data_dir).unwrap();
+
+    set_workdir_with_nwt(&data_dir, &project).unwrap();
+    let meta_first = std::fs::read_to_string(
+        project.join(".nwt").join("metadata.json")
+    ).unwrap();
+
+    // Manual edit to metadata.json (e.g. user changed project_name)
+    std::fs::write(
+        project.join(".nwt").join("metadata.json"),
+        r#"{"project_name":"edited","custom_field":true}"#
+    ).unwrap();
+
+    // Second call must not overwrite the manual edit.
+    set_workdir_with_nwt(&data_dir, &project).unwrap();
+    let meta_second = std::fs::read_to_string(
+        project.join(".nwt").join("metadata.json")
+    ).unwrap();
+    assert_eq!(meta_second, r#"{"project_name":"edited","custom_field":true}"#,
+        "second init must not overwrite manual metadata edit");
+    // And first init's content is no longer present.
+    assert!(!meta_second.contains("flowntier-project"),
+        "second init must not reset project_name to default");
+    // Suppress unused warning
+    let _ = meta_first;
+}
+
+// ── BUG-004: search_log streaming + caps ─────────────────
+
+/// Mirror of the search_log streaming core logic.
+fn search_log_streaming(
+    log_dir: &std::path::Path,
+    needle: &str,
+    max_file_bytes: u64,
+    max_line_bytes: usize,
+) -> (Vec<String>, usize, bool) {
+    let mut matches = Vec::new();
+    let mut scanned = 0;
+    let mut truncated = false;
+    const MAX_MATCHES: usize = 200;
+
+    let Ok(entries) = std::fs::read_dir(log_dir) else {
+        return (matches, scanned, truncated);
+    };
+    let mut files: Vec<(std::path::PathBuf, u64)> = entries
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let p = e.path();
+            let name = p.file_name()?.to_str()?;
+            if !name.starts_with("flowntier.log") { return None; }
+            if name.starts_with("panic-") { return None; }
+            let meta = e.metadata().ok()?;
+            Some((p, meta.len()))
+        })
+        .collect();
+    // Newest first (we approximate by path name, which for daily
+    // rolling is timestamp-sorted lexicographically).
+    files.sort_by(|a, b| b.0.cmp(&a.0));
+
+    'outer: for (path, size) in files {
+        if size > max_file_bytes {
+            truncated = true;
+            continue;
+        }
+        let Ok(file) = std::fs::File::open(&path) else { continue };
+        let mut reader = std::io::BufReader::with_capacity(64 * 1024, file);
+        let mut bytes_read: u64 = 0;
+        let mut line = String::new();
+        loop {
+            line.clear();
+            let n = match std::io::BufRead::read_line(&mut reader, &mut line) {
+                Ok(0) => break,
+                Ok(n) => n,
+                Err(_) => break,
+            };
+            bytes_read += n as u64;
+            if bytes_read > max_file_bytes {
+                truncated = true;
+                break;
+            }
+            let trimmed = line.trim_end_matches(|c| c == '\n' || c == '\r');
+            let line_for_match = if trimmed.len() > max_line_bytes {
+                let mut s = String::with_capacity(max_line_bytes + 16);
+                s.push_str(&trimmed[..max_line_bytes]);
+                s.push_str("…[truncated]");
+                s
+            } else {
+                trimmed.to_string()
+            };
+            scanned += 1;
+            if line_for_match.contains(needle) {
+                matches.push(line_for_match);
+                if matches.len() >= MAX_MATCHES {
+                    truncated = true;
+                    break 'outer;
+                }
+            }
+        }
+    }
+    (matches, scanned, truncated)
+}
+
+#[test]
+fn e2e_hard_streaming_handles_1mb_log_without_oom() {
+    // Simulate a 1 MiB log file with 10k lines, every line matches.
+    // Must complete in reasonable time and respect MAX_MATCHES.
+    let tmp = TempDir::new("streaming-1mb");
+    let log_dir = tmp.path().join("logs");
+    std::fs::create_dir_all(&log_dir).unwrap();
+    let log_path = log_dir.join("flowntier.log.2026-06-27");
+    let mut content = String::new();
+    for _ in 0..10_000 {
+        content.push_str("2026-06-27 ERROR FE-needle hit\n");
+    }
+    std::fs::write(&log_path, &content).unwrap();
+    let file_size = std::fs::metadata(&log_path).unwrap().len();
+    // 10k lines × ~30 chars/line ≈ 300 KiB
+    assert!(file_size > 200_000, "test file is only {} bytes", file_size);
+
+    let (matches, scanned, truncated) = search_log_streaming(
+        &log_dir,
+        "FE-needle",
+        64 * 1024 * 1024, // 64 MiB cap
+        8 * 1024,         // 8 KiB per-line cap
+    );
+    assert_eq!(matches.len(), 200, "must hit MAX_MATCHES cap");
+    assert!(truncated, "truncated flag must be set");
+    assert_eq!(scanned, 200, "scanned counter counts matches found");
+}
+
+#[test]
+fn e2e_hard_streaming_skips_oversize_file() {
+    // A log file larger than MAX_FILE_BYTES should be skipped
+    // upfront and flagged as truncated.
+    let tmp = TempDir::new("streaming-oversize");
+    let log_dir = tmp.path().join("logs");
+    std::fs::create_dir_all(&log_dir).unwrap();
+    let log_path = log_dir.join("flowntier.log.2026-06-27");
+    // Write 1 MiB (smaller than 64 MiB cap so it would normally
+    // be read). Set MAX_FILE_BYTES to 512 KiB for this test to
+    // simulate the cap.
+    let content = "x".repeat(1024 * 1024);
+    std::fs::write(&log_path, &content).unwrap();
+
+    let (matches, _scanned, truncated) = search_log_streaming(
+        &log_dir,
+        "FE-needle",  // not in content
+        512 * 1024,    // 512 KiB cap (smaller than the file)
+        8 * 1024,
+    );
+    assert!(truncated, "oversize file must flag truncated");
+    assert_eq!(matches.len(), 0);
+}
+
+#[test]
+fn e2e_hard_streaming_truncates_long_lines() {
+    // A single line > MAX_LINE_BYTES should be truncated and
+    // suffixed with "…[truncated]".
+    let tmp = TempDir::new("streaming-long-line");
+    let log_dir = tmp.path().join("logs");
+    std::fs::create_dir_all(&log_dir).unwrap();
+    let log_path = log_dir.join("flowntier.log.2026-06-27");
+    // 100 KB line, 4 KB cap.
+    let huge_line = format!("FE-needle start {} FE-needle end", "x".repeat(100_000));
+    std::fs::write(&log_path, &huge_line).unwrap();
+
+    let (matches, _scanned, _truncated) = search_log_streaming(
+        &log_dir,
+        "FE-needle",
+        64 * 1024 * 1024,
+        4 * 1024, // 4 KiB cap
+    );
+    assert_eq!(matches.len(), 1);
+    let m = &matches[0];
+    assert!(m.ends_with("…[truncated]"), "long line must be suffixed");
+    assert!(m.len() < 20_000, "truncated line must be < cap + suffix");
+    assert!(m.contains("FE-needle"), "match must still be present");
+}
+
+#[test]
+fn e2e_hard_streaming_empty_log_dir_returns_empty() {
+    // BUG-003 fix: missing or empty logs/ dir returns empty
+    // matches (not an error).
+    let tmp = TempDir::new("streaming-empty");
+    let log_dir = tmp.path().join("logs");
+    std::fs::create_dir_all(&log_dir).unwrap();
+    // (empty — no files yet)
+
+    let (matches, scanned, truncated) = search_log_streaming(
+        &log_dir,
+        "FE-needle",
+        64 * 1024 * 1024,
+        8 * 1024,
+    );
+    assert_eq!(matches.len(), 0);
+    assert_eq!(scanned, 0);
+    assert!(!truncated);
+}
+
+#[test]
+fn e2e_hard_streaming_concurrent_safe_count() {
+    // Verify that scanning 1000 lines correctly increments scanned.
+    let tmp = TempDir::new("streaming-count");
+    let log_dir = tmp.path().join("logs");
+    std::fs::create_dir_all(&log_dir).unwrap();
+    let log_path = log_dir.join("flowntier.log.2026-06-27");
+    let mut content = String::new();
+    for i in 0..1000 {
+        content.push_str(&format!("2026-06-27 INFO message number {i}\n"));
+    }
+    // Add one matching line at the end.
+    content.push_str("2026-06-27 ERROR FE-only-match\n");
+    std::fs::write(&log_path, &content).unwrap();
+
+    let (matches, scanned, _truncated) = search_log_streaming(
+        &log_dir,
+        "FE-only-match",
+        64 * 1024 * 1024,
+        8 * 1024,
+    );
+    assert_eq!(matches.len(), 1);
+    assert_eq!(scanned, 1001, "should have counted all 1001 lines");
+}

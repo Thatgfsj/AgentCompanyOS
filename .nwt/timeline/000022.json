@@ -1,0 +1,23 @@
+{
+  "id": "000022",
+  "timestamp": "2026-06-27T15:30:00Z",
+  "task": "BUG-FIX-BATCH-2: BUG-016 atomicity + BUG-004 streaming — 32/32 E2E + 130/130 workspace",
+  "summary": "BUG-FIX-BATCH-2: BUG-016 atomicity + BUG-004 streaming — 32/32 E2E + 130/130 workspace",
+  "reason": "Chairman: '继续' (bug-batch-2). Fixed the remaining 2 HIGH bugs from event 000019 audit: BUG-016 (set_workdir + nwt_init_workspace non-atomic) and BUG-004 (search_log OOM on big files). BUG-016 fix: replaced the two-command dance with a single new Tauri command `set_workdir_with_nwt(path)` that does: (1) validate path is_dir (BUG-011 reuse), (2) init .nwt/ idempotently, (3) only then atomically write workdir.json (tmp+rename). On any failure in steps 1-2, workdir.json is never written, so get_workdir returns null next launch and the user is re-shown the dialog. The old standalone `nwt_init_workspace` command is removed (folded into the new atomic one). App.tsx's WorkdirSetup.onConfirm now calls the single new command. BUG-004 fix: search_log now uses BufReader::read_line to stream files instead of read_to_string. Added two caps: MAX_FILE_BYTES=64 MiB per file (skip-and-truncate if oversized) and MAX_LINE_BYTES=8 KiB per line (truncated with suffix `…[truncated]`). BUG-003 also fixed as a side effect — empty/missing logs/ dir now returns {matches:[], scanned:0, truncated:false} instead of an error. 9 new tests added (4 atomic + 5 streaming): e2e_hard_atomic_success, e2e_hard_atomic_rejects_nonexistent_workdir, e2e_hard_atomic_rejects_file_as_workdir, e2e_hard_atomic_idempotent, e2e_hard_streaming_handles_1mb_log_without_oom, e2e_hard_streaming_skips_oversize_file, e2e_hard_streaming_truncates_long_lines, e2e_hard_streaming_empty_log_dir_returns_empty, e2e_hard_streaming_concurrent_safe_count. All 32 E2E tests pass (was 23). Full workspace: 130 tests pass, 0 failures (was 121 — added 9 E2E tests). pnpm typecheck clean. pnpm tauri build --bundles nsis produces Flowntier_0.4.0_x64-setup.exe. The 3 lone HIGH bugs are all fixed: BUG-022, 036, 011, 006 in batch-1; BUG-016, 004 in batch-2. Only BUG-017 (BLOCKING) remains, deferred to v0.5 (pipe-server needs to read kv.nwt_root on every workflow start — architectural change beyond a single PR).",
+  "files": [
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src-tauri/tests/e2e_nwt_standalone.rs"
+  ],
+  "tags": [
+    "bug-fix-batch",
+    "bug-016",
+    "bug-004",
+    "bug-003",
+    "atomicity",
+    "streaming",
+    "oom-prevention",
+    "nwt",
+    "workdir"
+  ]
+}

@@ -10,7 +10,7 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use tauri::Manager;
 use tauri::Emitter;
@@ -816,12 +816,25 @@ fn search_log(code: String, since: Option<String>) -> Result<serde_json::Value, 
     let log_dir = tauri_core::logging::log_dir(&data_dir);
     let entries = match std::fs::read_dir(&log_dir) {
         Ok(e) => e,
-        Err(e) => return Err(format!("read_dir {}: {e}", log_dir.display())),
+        Err(e) => {
+            // BUG-003 fix: a fresh install (or post-wipe_all_data)
+            // has no logs/ dir yet. Treat as "empty result" rather
+            // than an error — the user's UI shows "scanned 0 files"
+            // instead of a scary "search failed" message.
+            if e.kind() == std::io::ErrorKind::NotFound {
+                return Ok(serde_json::json!({
+                    "matches": Vec::<String>::new(),
+                    "scanned": 0,
+                    "truncated": false,
+                }));
+            }
+            return Err(format!("read_dir {}: {e}", log_dir.display()));
+        }
     };
     // Collect (path, modified) so we can scan newest-first. A
     // user who just hit the error wants to see today's lines
     // before yesterday's.
-    let mut files: Vec<(std::path::PathBuf, std::time::SystemTime)> = entries
+    let mut files: Vec<(std::path::PathBuf, std::time::SystemTime, u64)> = entries
         .filter_map(|e| e.ok())
         .filter_map(|e| {
             let p = e.path();
@@ -834,7 +847,8 @@ fn search_log(code: String, since: Option<String>) -> Result<serde_json::Value, 
             }
             let meta = e.metadata().ok()?;
             let mtime = meta.modified().ok()?;
-            Some((p, mtime))
+            let size = meta.len();
+            Some((p, mtime, size))
         })
         .collect();
     files.sort_by(|a, b| b.1.cmp(&a.1));
@@ -849,27 +863,73 @@ fn search_log(code: String, since: Option<String>) -> Result<serde_json::Value, 
     let _since_ignored = since;
 
     const MAX_MATCHES: usize = 200;
+    /// BUG-004 fix: cap the bytes we'll read from a single log
+    /// file at 64 MiB. Without this cap, a runaway log file
+    /// (e.g. an agent loop spamming errors) could OOM the Tauri
+    /// process. We stop reading at the cap but mark `truncated`
+    /// so the user knows there's more content we didn't scan.
+    const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
+    /// BUG-004 fix: cap individual lines at 8 KiB. Without this
+    /// cap, a single log line could be GB (e.g. an http body blob
+    /// without newlines) and one bad file would still pin RAM.
+    /// Lines longer than this are truncated and appended with
+    /// `…[truncated]` so the user can still see what matched.
+    const MAX_LINE_BYTES: usize = 8 * 1024;
+
     let mut matches: Vec<String> = Vec::new();
     let mut scanned: usize = 0;
     let mut truncated = false;
 
-    'outer: for (path, _mtime) in files {
-        let Ok(text) = std::fs::read_to_string(&path) else {
+    'outer: for (path, _mtime, size) in files {
+        // Skip files larger than MAX_FILE_BYTES upfront (cheap).
+        if size > MAX_FILE_BYTES {
+            truncated = true;
             continue;
+        }
+        let file = match std::fs::File::open(&path) {
+            Ok(f) => f,
+            Err(_) => continue, // permission denied / file vanished — skip
         };
-        for line in text.lines() {
+        let mut reader = std::io::BufReader::with_capacity(64 * 1024, file);
+        let mut bytes_read: u64 = 0;
+        let mut line = String::new();
+        loop {
+            line.clear();
+            let n = match std::io::BufRead::read_line(&mut reader, &mut line) {
+                Ok(0) => break, // EOF
+                Ok(n) => n,
+                Err(_) => break, // read error — skip rest of file
+            };
+            bytes_read += n as u64;
+            if bytes_read > MAX_FILE_BYTES {
+                truncated = true;
+                break;
+            }
+            // Strip the trailing newline (or \r\n) so the trimmed
+            // line we display doesn't have whitespace artifacts.
+            let trimmed = line.trim_end_matches(|c| c == '\n' || c == '\r');
+            // Per-line cap (BUG-004 fix).
+            let truncated_line = if trimmed.len() > MAX_LINE_BYTES {
+                let mut s = String::with_capacity(MAX_LINE_BYTES + 16);
+                s.push_str(&trimmed[..MAX_LINE_BYTES]);
+                s.push_str("…[truncated]");
+                s
+            } else {
+                trimmed.to_string()
+            };
             scanned += 1;
-            if line.contains(needle) {
-                // BUG-006 fix (event 000020): redact API keys, bearer
-                // tokens, and similar secrets before returning the
-                // line. The user might paste an error code from the
-                // ErrorBoundary, but the matched log line could
-                // contain `OPENAI_API_KEY=sk-…` or an Authorization
-                // header — sending that back to the webview exposes
-                // the secret (and the user can copy it from the
-                // modal). The redactor runs per-line, so non-secret
-                // context is preserved.
-                matches.push(redact_secrets(line));
+            if truncated_line.contains(needle) {
+                // BUG-006 fix (event 000020): redact API keys,
+                // bearer tokens, and similar secrets before
+                // returning the line. The user might paste an
+                // error code from the ErrorBoundary, but the
+                // matched log line could contain
+                // `OPENAI_API_KEY=sk-…` or an Authorization header
+                // — sending that back to the webview exposes the
+                // secret (and the user can copy it from the
+                // modal). The redactor runs per-line, so
+                // non-secret context is preserved.
+                matches.push(redact_secrets(&truncated_line));
                 if matches.len() >= MAX_MATCHES {
                     truncated = true;
                     break 'outer;
@@ -940,16 +1000,100 @@ async fn wipe_all_data() -> Result<(), String> {
 /// <data_dir>/workdir.json so it survives quit+relaunch.
 #[tauri::command]
 async fn set_workdir(path: String) -> Result<(), String> {
+    // BUG-016 fix: defer to set_workdir_with_nwt so the workdir
+    // write is gated on a successful `.nwt/` init. The atomicity
+    // guarantee (workdir.json is never written unless `.nwt/` is
+    // fully set up) holds for both `set_workdir` and the new
+    // `set_workdir_with_nwt` callers.
+    set_workdir_with_nwt(path).await.map(|_| ())
+}
+
+/// Atomically set the workdir AND initialise the project's
+/// `.nwt/` directory. BUG-016 fix.
+///
+/// Order of operations is deliberately:
+///
+///   1. Validate the path (exists + is_dir — BUG-011 reuse).
+///   2. Initialise `.nwt/` in the workdir (creates metadata.json,
+///      timeline/, indices/{tags,files}.json — idempotent).
+///   3. Only after step 2 succeeds, atomically write
+///      `workdir.json` to the data dir (tmp + rename).
+///
+/// If step 1 or 2 fails, `workdir.json` is never written, so on
+/// the next launch `get_workdir` returns `None` and the user is
+/// re-shown the WorkdirSetup dialog. This is the recovery
+/// strategy — we never persist half-initialised state.
+///
+/// Used by the Webview/TS frontend in App.tsx's WorkdirSetup
+/// confirm handler. Replaces the previous two-command dance
+/// (`set_workdir` + `nwt_init_workspace`) which had a partial-
+/// failure window where workdir was set but `.nwt/` was not.
+#[tauri::command]
+async fn set_workdir_with_nwt(path: String) -> Result<String, String> {
+    // Step 1: data dir + path validation.
     let Some(data_dir) = storage::Repository::default_data_dir() else {
         return Err("cannot determine data dir".into());
     };
     let _ = std::fs::create_dir_all(&data_dir);
-    let p = data_dir.join("workdir.json");
+    let root = std::path::PathBuf::from(&path);
+    if !root.exists() {
+        return Err(format!("workdir does not exist: {}", path));
+    }
+    if !root.is_dir() {
+        return Err(format!(
+            "workdir is not a directory: {}",
+            root.display()
+        ));
+    }
+
+    // Step 2: initialise `.nwt/` in the workdir. Idempotent.
+    let nwt_dir = root.join(".nwt");
+    std::fs::create_dir_all(nwt_dir.join("timeline"))
+        .map_err(|e| format!("mkdir timeline: {e}"))?;
+    std::fs::create_dir_all(nwt_dir.join("indices"))
+        .map_err(|e| format!("mkdir indices: {e}"))?;
+    let meta = nwt_dir.join("metadata.json");
+    if !meta.exists() {
+        let project_name = root
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("flowntier-project");
+        let payload = serde_json::json!({
+            "project_name": project_name,
+            "created_at": unix_secs_to_iso8601(std::time::SystemTime::now()),
+            "schema_version": 1,
+            "format": "nwt/0.1",
+        });
+        let bytes = serde_json::to_vec_pretty(&payload)
+            .map_err(|e| format!("serialize metadata: {e}"))?;
+        std::fs::write(&meta, bytes)
+            .map_err(|e| format!("write metadata: {e}"))?;
+    }
+    let tags_idx = nwt_dir.join("indices").join("tags.json");
+    if !tags_idx.exists() {
+        std::fs::write(&tags_idx, b"{}\n")
+            .map_err(|e| format!("write tags: {e}"))?;
+    }
+    let files_idx = nwt_dir.join("indices").join("files.json");
+    if !files_idx.exists() {
+        std::fs::write(&files_idx, b"{}\n")
+            .map_err(|e| format!("write files: {e}"))?;
+    }
+
+    // Step 3: only NOW persist the workdir, atomically (tmp + rename
+    // to avoid a torn write that would brick get_workdir).
+    let wd_file = data_dir.join("workdir.json");
     let payload = serde_json::json!({ "workdir": path });
-    std::fs::write(&p, serde_json::to_vec_pretty(&payload).map_err(|e| e.to_string())?)
-        .map_err(|e| format!("write {}: {e}", p.display()))?;
-    tracing::info!(path = %path, "Workdir set");
-    Ok(())
+    let bytes = serde_json::to_vec_pretty(&payload)
+        .map_err(|e| format!("serialize workdir: {e}"))?;
+    let tmp = wd_file.with_extension("json.tmp");
+    std::fs::write(&tmp, &bytes)
+        .map_err(|e| format!("write tmp {}: {e}", tmp.display()))?;
+    std::fs::rename(&tmp, &wd_file)
+        .map_err(|e| format!("rename to {}: {e}", wd_file.display()))?;
+
+    tracing::info!(path = %path, nwt = %nwt_dir.display(), "Workdir + .nwt initialised atomically");
+    Ok(nwt_dir.to_string_lossy().into_owned())
 }
 
 /// Read the workspace workdir. Returns null if not yet set
@@ -1007,76 +1151,9 @@ pub fn civil_from_days(z: i64) -> (i32, u32, u32) {
     (y, m, d)
 }
 
-/// Initialize the .nwt/ project-memory directory at the given
-/// workdir. Idempotent — calling twice on the same project is
-/// a no-op (metadata.json is preserved). Mirrors what the
-/// TypeScript `initWorkspace()` in apps/desktop/src/tools/nwt.ts
-/// did before BUG-001 forced us off it (that file imports
-/// node:fs/path which vite can't bundle for the webview).
-///
-/// Creates:
-///   <path>/.nwt/metadata.json
-///   <path>/.nwt/timeline/         (empty dir, files added later)
-///   <path>/.nwt/indices/tags.json
-///   <path>/.nwt/indices/files.json
-///
-/// Returns the absolute path to .nwt/ for caller convenience.
-#[tauri::command]
-fn nwt_init_workspace(path: String) -> Result<String, String> {
-    let root = std::path::PathBuf::from(&path);
-    if !root.exists() {
-        return Err(format!("workdir does not exist: {}", path));
-    }
-    // BUG-011 fix (event 000020): the user might accidentally pick
-    // an existing file (e.g. resume.docx) as their workdir. Without
-    // this guard, `create_dir_all` happily creates <file>/.nwt/ next
-    // to the original file, polluting Documents/. We require an
-    // actual directory.
-    if !root.is_dir() {
-        return Err(format!(
-            "workdir is not a directory: {}",
-            root.display()
-        ));
-    }
-    let nwt_dir = root.join(".nwt");
-    std::fs::create_dir_all(nwt_dir.join("timeline"))
-        .map_err(|e| format!("mkdir timeline: {e}"))?;
-    std::fs::create_dir_all(nwt_dir.join("indices"))
-        .map_err(|e| format!("mkdir indices: {e}"))?;
-    // metadata.json is only written on first init — we don't
-    // want to clobber the project_name or created timestamp on
-    // subsequent launches.
-    let meta = nwt_dir.join("metadata.json");
-    if !meta.exists() {
-        // RFC 3339 / ISO 8601, second precision (matches the
-        // upstream nwt CLI's `now_iso()` helper). We compute
-        // this from std::time so we don't pull chrono into the
-        // desktop crate (tauri-core has it, but desktop doesn't).
-        let now = unix_secs_to_iso8601(SystemTime::now());
-        let payload = serde_json::json!({
-            "project_name": root
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("flowntier-project"),
-            "created_at": now,
-            "schema_version": 1,
-            "format": "nwt/0.1",
-        });
-        std::fs::write(&meta, serde_json::to_vec_pretty(&payload).unwrap())
-            .map_err(|e| format!("write metadata: {e}"))?;
-    }
-    // Empty indices — same as upstream nwt does on first run.
-    let tags_idx = nwt_dir.join("indices").join("tags.json");
-    if !tags_idx.exists() {
-        std::fs::write(&tags_idx, b"{}\n").map_err(|e| format!("write tags: {e}"))?;
-    }
-    let files_idx = nwt_dir.join("indices").join("files.json");
-    if !files_idx.exists() {
-        std::fs::write(&files_idx, b"{}\n").map_err(|e| format!("write files: {e}"))?;
-    }
-    tracing::info!(workdir = %path, nwt = %nwt_dir.display(), "nwt workspace initialised");
-    Ok(nwt_dir.to_string_lossy().into_owned())
-}
+/// (Removed: standalone `nwt_init_workspace` command — folded
+/// into `set_workdir_with_nwt` for BUG-016 atomicity. See event
+/// 000022. App.tsx no longer calls it.)
 
 fn workflow_to_json(wf: storage::Workflow) -> serde_json::Value {
     serde_json::json!({
@@ -1181,8 +1258,7 @@ pub fn run() {
             rpc_version,
             wipe_all_data,
             search_log,
-            get_workdir, set_workdir,
-            nwt_init_workspace,
+            get_workdir, set_workdir, set_workdir_with_nwt,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
