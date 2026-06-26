@@ -1,0 +1,21 @@
+{
+  "id": "000017",
+  "timestamp": "2026-06-27T13:00:00Z",
+  "task": "BUG-001 FIXED + BUG-002 found: MSI bundler wants MSVC runtime, only GNU exists",
+  "summary": "BUG-001 FIXED + BUG-002 found: MSI bundler wants MSVC runtime, only GNU exists",
+  "reason": "Chairman: '及时记录bug, 回头统一修理'. Polish 16 build pass 2. BUG-001 (nwt.ts uses node:fs/path in webview) FIXED by: (a) deleting apps/desktop/src/tools/nwt.ts and its parent dir; (b) adding Rust Tauri command nwt_init_workspace in apps/desktop/src-tauri/src/lib.rs that mirrors initWorkspace() — creates .nwt/metadata.json + .nwt/timeline/ + .nwt/indices/{tags,files}.json idempotently; (c) zero-dep ISO 8601 timestamp via Howard Hinnant civil_from_days algorithm (avoids chrono dep that only tauri-core has); (d) rewiring App.tsx WorkdirSetup.onConfirm to call invoke('nwt_init_workspace', {path:p}) instead of the broken TS initWorkspace. pnpm typecheck clean, cargo check -p flowntier-desktop clean. pnpm tauri build now passes vite + rustc — exe at target/release/flowntier-desktop.exe (14.6 MB). BUG-002 found: Tauri MSI bundler wants binaries/flowntier_runtime-x86_64-pc-windows-msvc.exe but only ...-gnu.exe exists. Severity: cosmetic for E2E (exe runs without MSI). Workaround: skip msi target via `pnpm tauri build --bundles none` or build with --target x86_64-pc-windows-msvc. Fix: build the runtime sidecar with MSVC toolchain, or change tauri.conf.json bundle.targets to nsis. Repro: pnpm tauri build at 2bcf032+1.",
+  "files": [
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/tools/nwt.ts"
+  ],
+  "tags": [
+    "bug-fix",
+    "bug-001",
+    "bug-002",
+    "nwt",
+    "build",
+    "msi",
+    "sidecar"
+  ]
+}

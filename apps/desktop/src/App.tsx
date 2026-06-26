@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { check as checkUpdaterPlugin } from '@tauri-apps/plugin-updater';
 import { checkForUpdate, installUpdate, type UpdateBanner } from './lib/updater';
 import { kvGet, kvSet } from './lib/api.js';
-import { initWorkspace as nwtInit } from './tools/nwt.js';
 import { Welcome } from './components/Welcome';
 import { WorkdirSetup } from './components/WorkdirSetup';
 import { PhaseTimeline, AgentCard, Card, type PhaseState, type AgentStatus } from '@flowntier/ui';
@@ -493,13 +492,18 @@ export function App() {
           try {
             await invoke('set_workdir', { path: p });
             setWorkdir(p);
-            // NWT embedding Step F: the nwt_log tool needs the
-            // workspace root. Persist it both client-side (TS
-            // initWorkspace) and Rust-side (set_nwt_root called
-            // by the React effect below). The two implementations
-            // write the same data format.
-            try { nwtInit(p); } catch (e) {
-              console.warn('[App] nwt init (TS) failed:', e);
+            // NWT Step F (Polish 16 fix for BUG-001): the TS
+            // initWorkspace() in tools/nwt.ts can't run in the
+            // webview (it imports node:fs/path). We replaced it
+            // with a Rust Tauri command (nwt_init_workspace) that
+            // creates the same .nwt/ skeleton. The Rust agent
+            // loop's nwt.rs reads from kv.nwt_root (set below in
+            // startRealWorkflow), so the two implementations stay
+            // in sync via the kv table.
+            try {
+              await invoke('nwt_init_workspace', { path: p });
+            } catch (e) {
+              console.warn('[App] nwt_init_workspace (Rust) failed:', e);
             }
           } catch (e) {
             console.error('[App] set_workdir failed:', e);

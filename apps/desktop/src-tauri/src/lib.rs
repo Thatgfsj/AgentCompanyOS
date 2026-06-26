@@ -10,7 +10,7 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use tauri::Manager;
 use tauri::Emitter;
@@ -747,6 +747,103 @@ async fn get_workdir() -> Result<Option<String>, String> {
     Ok(v.get("workdir").and_then(|v| v.as_str()).map(|s| s.to_string()))
 }
 
+/// Convert a `SystemTime` to an ISO 8601 UTC string with second
+/// precision (e.g. "2026-06-27T12:34:56Z"). Howard Hinnant's
+/// `days_from_civil` algorithm — no chrono dep required.
+///
+/// Returns `"1970-01-01T00:00:00Z"` if `t` predates the unix
+/// epoch (vanishingly unlikely but Rust's `SystemTime` allows it).
+fn unix_secs_to_iso8601(t: std::time::SystemTime) -> String {
+    use std::time::UNIX_EPOCH;
+    let secs = t.duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let (year, month, day) = civil_from_days((secs / 86_400) as i64);
+    let time_of_day = (secs % 86_400) as u32;
+    let hour = time_of_day / 3600;
+    let minute = (time_of_day % 3600) / 60;
+    let second = time_of_day % 60;
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        year, month, day, hour, minute, second
+    )
+}
+
+/// Howard Hinnant's `civil_from_days` (inverse of
+/// `days_from_civil`). Given days since 1970-01-01, returns
+/// (year, month, day). See http://howardhinnant.github.io/date_algorithms.html
+fn civil_from_days(z: i64) -> (i32, u32, u32) {
+    let z = z + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u32; // [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365; // [0, 399]
+    let y = (yoe as i32) + (era as i32) * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153; // [0, 11]
+    let d = doy - (153 * mp + 2) / 5 + 1; // [1, 31]
+    let m = if mp < 10 { mp + 3 } else { mp - 9 }; // [1, 12]
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
+}
+
+/// Initialize the .nwt/ project-memory directory at the given
+/// workdir. Idempotent — calling twice on the same project is
+/// a no-op (metadata.json is preserved). Mirrors what the
+/// TypeScript `initWorkspace()` in apps/desktop/src/tools/nwt.ts
+/// did before BUG-001 forced us off it (that file imports
+/// node:fs/path which vite can't bundle for the webview).
+///
+/// Creates:
+///   <path>/.nwt/metadata.json
+///   <path>/.nwt/timeline/         (empty dir, files added later)
+///   <path>/.nwt/indices/tags.json
+///   <path>/.nwt/indices/files.json
+///
+/// Returns the absolute path to .nwt/ for caller convenience.
+#[tauri::command]
+fn nwt_init_workspace(path: String) -> Result<String, String> {
+    let root = std::path::PathBuf::from(&path);
+    if !root.exists() {
+        return Err(format!("workdir does not exist: {}", path));
+    }
+    let nwt_dir = root.join(".nwt");
+    std::fs::create_dir_all(nwt_dir.join("timeline"))
+        .map_err(|e| format!("mkdir timeline: {e}"))?;
+    std::fs::create_dir_all(nwt_dir.join("indices"))
+        .map_err(|e| format!("mkdir indices: {e}"))?;
+    // metadata.json is only written on first init — we don't
+    // want to clobber the project_name or created timestamp on
+    // subsequent launches.
+    let meta = nwt_dir.join("metadata.json");
+    if !meta.exists() {
+        // RFC 3339 / ISO 8601, second precision (matches the
+        // upstream nwt CLI's `now_iso()` helper). We compute
+        // this from std::time so we don't pull chrono into the
+        // desktop crate (tauri-core has it, but desktop doesn't).
+        let now = unix_secs_to_iso8601(SystemTime::now());
+        let payload = serde_json::json!({
+            "project_name": root
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("flowntier-project"),
+            "created_at": now,
+            "schema_version": 1,
+            "format": "nwt/0.1",
+        });
+        std::fs::write(&meta, serde_json::to_vec_pretty(&payload).unwrap())
+            .map_err(|e| format!("write metadata: {e}"))?;
+    }
+    // Empty indices — same as upstream nwt does on first run.
+    let tags_idx = nwt_dir.join("indices").join("tags.json");
+    if !tags_idx.exists() {
+        std::fs::write(&tags_idx, b"{}\n").map_err(|e| format!("write tags: {e}"))?;
+    }
+    let files_idx = nwt_dir.join("indices").join("files.json");
+    if !files_idx.exists() {
+        std::fs::write(&files_idx, b"{}\n").map_err(|e| format!("write files: {e}"))?;
+    }
+    tracing::info!(workdir = %path, nwt = %nwt_dir.display(), "nwt workspace initialised");
+    Ok(nwt_dir.to_string_lossy().into_owned())
+}
+
 fn workflow_to_json(wf: storage::Workflow) -> serde_json::Value {
     serde_json::json!({
         "id": wf.id,
@@ -851,6 +948,7 @@ pub fn run() {
             wipe_all_data,
             search_log,
             get_workdir, set_workdir,
+            nwt_init_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
