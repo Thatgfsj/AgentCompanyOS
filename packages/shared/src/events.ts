@@ -17,7 +17,8 @@ export type WfEvent =
   | ConsoleEvent
   | MilestoneEvent
   | UserQueryEvent
-  | TaskStatusEvent;
+  | TaskStatusEvent
+  | WorkflowCompleteEvent;
 
 export type TaskStatusKind =
   | 'PENDING'
@@ -67,6 +68,12 @@ export interface MilestoneEvent {
   readonly kind: 'milestone';
   readonly phase: string;
   readonly label: string;
+  /** BUG-FRONTEND-RT-3 (event 000029): optional status for
+   *  completion detection. 'completed' on the delivery milestone
+   *  signals the workflow is done; the webview's applyEvent
+   *  unblocks the cmd bar immediately without waiting for the
+   *  Rust-side polling loop. */
+  readonly status?: 'started' | 'in_progress' | 'completed' | 'failed';
 }
 
 export interface UserQueryEvent {
@@ -74,6 +81,18 @@ export interface UserQueryEvent {
   readonly query_id: string;
   readonly question: string;
   readonly options: readonly string[];
+}
+
+/** BUG-FRONTEND-RT-3 (event 000029): emitted by the Rust runtime
+ *  once the agent finishes the report and the workflow is
+ *  complete. Webview's applyEvent handler unblocks the cmd
+ *  bar immediately on seeing this. Optional in the schema —
+ *  Rust-side may not always emit it (e.g. on a hard crash). */
+export interface WorkflowCompleteEvent {
+  readonly kind: 'workflow_complete';
+  readonly wf_id: string;
+  readonly status: 'DONE' | 'FAILED' | 'ABORTED';
+  readonly summary?: string;
 }
 
 export interface TaskStatusEvent {

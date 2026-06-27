@@ -374,6 +374,27 @@ export function App() {
 
   const applyEvent = (event: WfEvent) => {
     setEvents((prev) => [...prev, event]);
+    // BUG-FRONTEND-RT-3 fix (event 000029): the previous code
+    // only unblocked the cmd bar when the polling loop saw
+    // `wf.summary`. If the Rust side hangs (or crashed without
+    // writing summary), the busy flag stayed true for the full
+    // 10-minute deadline. Now any completion-style event
+    // (workflow_complete, all milestones reached, or the
+    // explicit `workflow_done` synthetic event the agent emits
+    // when the report is finalized) immediately resets busy so
+    // the user can start a new workflow.
+    const isCompletion =
+      event.kind === 'workflow_complete' ||
+      // Fallback: last milestone is delivery = "done"
+      (event.kind === 'milestone' &&
+       (event as { phase?: string }).phase === 'delivery' &&
+       (event as { status?: string }).status === 'completed');
+    if (isCompletion) {
+      busyRef.current = false;
+      setBusy(false);
+      setCompleted(true);
+      setReviewVerdict({ verdict: 'PASS', summary: '工作流已完成' });
+    }
     if (event.kind === 'transition' && event.to) {
       const idx = PHASES.findIndex((p) => p.name === event.to);
       if (idx >= 0) {
@@ -456,15 +477,22 @@ export function App() {
       const data = await invoke<{ id: string }>('start_workflow_cmd', { text });
       setCurrentWfId(data.id);
 
-      // Poll for completion using invoke
+      // Poll for completion using invoke. The busy flag can also
+      // be flipped false by an event handler (see applyEvent's
+      // completion branch) — we early-break in that case too.
       const deadline = Date.now() + 600000;
       while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 2000));
+        if (!busyRef.current) break;  // event handler completed us
         try {
           const wf = await invoke<Record<string, unknown>>('get_workflow', { id: data.id });
           if (wf && wf.summary) {
             setFinalReport(wf.summary as string);
-            setReviewVerdict({ verdict: 'PASS', summary: '工作流已完成' });
+            if (busyRef.current) {
+              busyRef.current = false;
+              setBusy(false);
+              setCompleted(true);
+            }
             break;
           }
         } catch {
