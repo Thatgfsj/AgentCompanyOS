@@ -53,3 +53,35 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Polish 17: animated transitions ───────────────────── */
+
+/* Step cards in Welcome: fade-in + slight slide-up on mount */
+@keyframes flt-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Apply to any element with .flt-anim-in */
+.flt-anim-in {
+  animation: flt-fade-in 280ms ease-out both;
+}
+
+/* Step-pill progress dot pulses when active */
+@keyframes flt-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+.flt-anim-pulse {
+  animation: flt-pulse 1.6s ease-in-out infinite;
+}
+
+/* ErrorBoundary shake on error appearance */
+@keyframes flt-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.flt-anim-shake {
+  animation: flt-shake 380ms ease-in-out;
+}

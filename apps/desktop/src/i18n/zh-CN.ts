@@ -85,6 +85,7 @@ const zhCN = {
   'settings.providers.disabled': '已停用',
   'settings.providers.discoverModels': '拉取最新模型',
   'settings.secrets.addKey': '添加 API 密钥',
+  'settings.secrets.saveKeyFor': '保存 {{provider}} API 密钥',
   'settings.secrets.placeholder': '粘贴 API 密钥 (sk-...)',
   'settings.secrets.never': '密钥不会离开本机。',
   'settings.headerSubtitle': '管理 LLM 供应商和角色模型',

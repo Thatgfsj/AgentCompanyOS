@@ -1,0 +1,29 @@
+{
+  "id": "000033",
+  "timestamp": "2026-06-27T21:30:00Z",
+  "task": "Polish 17 + v0.4 README + final LOW-bug cleanup",
+  "summary": "Polish 17 + v0.4 README + final LOW-bug cleanup",
+  "reason": "Chairman: '123, 开始吧' (1=Polish 17, 2=README, 3=continue fixing LOW). 1. Polish 17 (CSS animations) — added 3 @keyframes (flt-fade-in, flt-pulse, flt-shake) to apps/desktop/src/index.css. Welcome step cards get `flt-anim-in` (280ms fade + slide-up) on mount; active progress dot gets `flt-anim-pulse` (1.6s loop). ErrorBoundary overlay gets `flt-anim-shake` (380ms) on first render to draw attention. All animations honor the existing `prefers-reduced-motion: reduce` media query. 2. RELEASE_v0.4.md — comprehensive release summary (TL;DR, architecture, i18n guide, full bug table, NWT event timeline, verification matrix, known limitations, chairman quotes). 3. Final LOW-bug cleanup — fixed 3 audit findings: (a) Settings.tsx:137 had a locale-broken `.replace('Add API key', 'Save ${provider} API Key')` on a translated string, replaced with proper i18n key `settings.secrets.saveKeyFor` with `{{provider}}` interpolation; (b) Settings.tsx:1172 had hardcoded English 'API Key' label, replaced with `t('settings.custom.apiKeyLabel')`; (c) ReviewVerdict added optional `severityLabels` prop so the `[MAJOR]/[MINOR]/[NIT]` badges in issue lists now translate; App.tsx passes the i18n-mapped labels to the live ReviewVerdict. Verification: 39/39 Rust E2E pass, pnpm typecheck clean, pnpm tauri build --bundles nsis produces 16 MB Flowntier_0.4.0_x64-setup.exe, i18n-flip screenshot E2E: no console errors, all dashboard strings translate. This is the v0.4 final commit batch. Remaining known limitations: BUG-017 full fix (pipe-server must read nwt_root.json — v0.5), locale preference not persisted (v0.5), no CI yet (v0.5), macOS / Linux installers not built (deferred).",
+  "files": [
+    "apps/desktop/src/index.css",
+    "apps/desktop/src/components/Welcome.tsx",
+    "apps/desktop/src/components/ErrorBoundary.tsx",
+    "apps/desktop/src/zones/Settings.tsx",
+    "apps/desktop/src/App.tsx",
+    "packages/ui/src/components/ReviewVerdict.tsx",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts",
+    "RELEASE_v0.4.md"
+  ],
+  "tags": [
+    "polish-17",
+    "animations",
+    "readme",
+    "release-notes",
+    "low-bugs",
+    "settings-fix",
+    "reviewVerdict",
+    "severity-label",
+    "locale-broken-replace"
+  ]
+}

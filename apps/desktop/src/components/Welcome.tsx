@@ -359,7 +359,7 @@ function Step3(props: { onEnter: () => void; onBack: () => void }) {
 
 function Card(props: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-border bg-surface-1 p-6 shadow-sm">
+    <div className="flt-anim-in rounded-lg border border-border bg-surface-1 p-6 shadow-sm">
       <h2 className="text-xl font-semibold text-text-primary">{props.title}</h2>
       {props.subtitle && (
         <p className="mt-1 text-sm text-text-secondary">{props.subtitle}</p>
@@ -369,12 +369,17 @@ function Card(props: { title: string; subtitle?: string; children: React.ReactNo
   );
 }
 
+// POLISH-17 (event 000033): animated card transitions. The
+// `flt-anim-in` class fades + slides each Welcome card on
+// mount; the parent component re-mounts the Card when the
+// step changes, so the transition replays for every step.
+
 function ProgressDot(props: { active: boolean; label: string }) {
   return (
     <div className="flex flex-col items-center gap-1">
       <div
         className={`h-3 w-3 rounded-full transition-colors ${
-          props.active ? 'bg-accent' : 'bg-border'
+          props.active ? 'bg-accent flt-anim-pulse' : 'bg-border'
         }`}
       />
       <span className={`text-xs ${props.active ? 'text-text-primary' : 'text-text-secondary'}`}>

@@ -21,6 +21,10 @@ export interface ReviewVerdictProps {
   verdictLabel?: string;
   /** Optional localized label for the confidence field. */
   confidenceLabel?: string;
+  /** Optional pre-mapped severity labels (e.g.
+   *  `{ MAJOR: t('reviewVerdict.severity.MAJOR'), ... }`).
+   *  Falls back to raw enum when not provided. */
+  severityLabels?: Partial<Record<ReviewIssue['severity'], string>>;
   className?: string;
 }
 
@@ -43,6 +47,7 @@ export function ReviewVerdict({
   summary,
   verdictLabel,
   confidenceLabel,
+  severityLabels,
   className,
 }: ReviewVerdictProps) {
   return (
@@ -72,7 +77,7 @@ export function ReviewVerdict({
               )}
             >
               <span className="font-mono text-[10px] uppercase tracking-wide">
-                [{iss.severity}]
+                [{severityLabels?.[iss.severity] ?? iss.severity}]
               </span>{' '}
               {iss.file && (
                 <span className="font-mono">

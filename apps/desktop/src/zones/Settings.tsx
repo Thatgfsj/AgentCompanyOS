@@ -134,7 +134,7 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
             disabled={busy || !apiKey.trim()}
             className="w-full rounded bg-chief px-3 py-2 text-sm font-medium text-white hover:bg-chief/90 disabled:opacity-50"
           >
-            {busy ? t('settings.action.save') : t('settings.secrets.addKey').replace('Add API key', `Save ${provider.name} API Key`)}
+            {busy ? t('settings.action.save') : t('settings.secrets.saveKeyFor', { provider: provider.name })}
           </button>
         </div>
       )}
@@ -1167,9 +1167,9 @@ function CustomProviderForm({ onSaved }: { onSaved: () => void }) {
           <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder={t('settings.custom.baseUrlPlaceholder')} className="rounded border border-border bg-surface-2 px-2 py-1.5 text-primary outline-none focus:border-chief" />
         </label>
 
-        {/* API Key */}
+        {/* API Key label (i18n) */}
         <label className="flex flex-col gap-1">
-          <span className="text-text-secondary">API Key</span>
+          <span className="text-text-secondary">{t('settings.custom.apiKeyLabel')}</span>
           <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={t('settings.custom.apiKeyPlaceholder')} className="rounded border border-border bg-surface-2 px-2 py-1.5 text-primary outline-none focus:border-chief" />
         </label>
 

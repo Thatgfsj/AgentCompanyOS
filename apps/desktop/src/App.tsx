@@ -791,6 +791,11 @@ export function App() {
                 verdict={reviewVerdict.verdict}
                 verdictLabel={t(`reviewVerdict.verdict.${reviewVerdict.verdict}`)}
                 confidenceLabel={t('reviewVerdict.confidence', { value: '1.00' })}
+                severityLabels={{
+                  MAJOR: t('reviewVerdict.severity.MAJOR'),
+                  MINOR: t('reviewVerdict.severity.MINOR'),
+                  NIT: t('reviewVerdict.severity.NIT'),
+                }}
                 confidence={1.0}
                 issues={[]}
                 summary={reviewVerdict.summary}

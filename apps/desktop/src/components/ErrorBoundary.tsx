@@ -221,7 +221,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     // i18n emits a 'languageChanged' event and React re-renders).
     const t = i18n.t.bind(i18n);
     return (
-      <div className="flex h-screen w-screen flex-col items-center justify-center bg-surface-1 px-6 text-text-primary">
+      <div className="flt-anim-shake flex h-screen w-screen flex-col items-center justify-center bg-surface-1 px-6 text-text-primary">
         <div className="max-w-2xl space-y-6">
           <div>
             <h1 className="text-3xl font-semibold text-error">
