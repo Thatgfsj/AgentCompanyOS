@@ -378,8 +378,13 @@ function ProgressDot(props: { active: boolean; label: string }) {
   return (
     <div className="flex flex-col items-center gap-1">
       <div
+        // BUG-FRONTEND-RT-5 (event 000036): the previous code
+        // used `bg-accent` which is not defined in index.css —
+        // the active dot rendered as a transparent circle and
+        // was invisible. Use `bg-chief` (the brand color, well
+        // defined) instead.
         className={`h-3 w-3 rounded-full transition-colors ${
-          props.active ? 'bg-accent flt-anim-pulse' : 'bg-border'
+          props.active ? 'bg-chief flt-anim-pulse' : 'bg-border'
         }`}
       />
       <span className={`text-xs ${props.active ? 'text-text-primary' : 'text-text-secondary'}`}>

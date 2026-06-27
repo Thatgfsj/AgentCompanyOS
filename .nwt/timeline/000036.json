@@ -1,0 +1,22 @@
+{
+  "id": "000036",
+  "timestamp": "2026-06-28T00:15:00Z",
+  "task": "v0.4.2: BUG-FRONTEND-RT-5 (ProgressDot invisible) + tauri version 0.4.2",
+  "summary": "v0.4.2: BUG-FRONTEND-RT-5 (ProgressDot invisible) + tauri version 0.4.2",
+  "reason": "Chairman: '在从头进行一次测试, 用截图, 一开始就不利' (run end-to-end from scratch, screenshot at every step, start by saying不利 [I want it to fail]). Real-user screenshot test on the v0.4.1 installer found 1 visual bug and revealed 1 process issue: BUG-FRONTEND-RT-5: the Welcome progress dot (the small filled circle at the top of the screen) was INVISIBLE because the class 'bg-accent' is not defined in index.css. The dot rendered as a transparent circle. The user could see the dot's text label (添加供应商/示例任务/开始使用) but the visual indicator (filled vs empty circle) was missing. Root cause: ProgressDot.tsx used 'bg-accent' (a Tailwind v4 utility that's not configured) instead of 'bg-chief' (the brand color, well-defined). The same 'bg-accent' was previously fixed in CenterPanel's button (FRONTEND-6 audit 000026) but I missed ProgressDot. Two-line fix in apps/desktop/src/components/Welcome.tsx: 'bg-accent flt-anim-pulse' → 'bg-chief flt-anim-pulse'. Process issue: the real-user test script tried to click '进入工作台' but matched the H2 title '第 3 步 — 进入工作台' instead of the button '进入工作台 →'. Fixed the Playwright selector to use exact text '进入工作台 →' with the arrow. Also bumped the Tauri app version to 0.4.2 in tauri.conf.json AND package.json so the NSIS installer filename now reads 'Flowntier_0.4.2_x64-setup.exe' (previously it was always 'Flowntier_0.4.0_x64-setup.exe' even for v0.4.1 — a cosmetic inconsistency the chairman might have noticed). Rebuilt NSIS installer (16,051,675 bytes = 15.3 MB) and copied to chairman's desktop. Verification: pnpm typecheck clean, 39/39 Rust E2E pass, real-user E2E re-run captured 17 screenshots in C:/Users/thatg/v041-realuser/ — the progress dots are now visible (orange filled circles for active, grey for pending), the dashboard renders correctly, the workflow runs end-to-end, bug search works with secret redaction. NWT event log + GitHub release v0.4.2 pending. Bug search + secret redaction screenshot at C:/Users/thatg/v041-realuser/16-bug-search-results.png shows the v0.4.2 redactor working perfectly: 'token=<redacted>' and 'key=sk-<redacted>' visible, raw secrets gone.",
+  "files": [
+    "apps/desktop/src/components/Welcome.tsx",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/package.json"
+  ],
+  "tags": [
+    "bug-fix",
+    "frontend-runtime",
+    "v0.4.2",
+    "ProgressDot",
+    "bg-accent-vs-bg-chief",
+    "tailwind-class",
+    "version-bump",
+    "real-user-test"
+  ]
+}
