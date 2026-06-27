@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ReactFlow,
   Background,
@@ -86,23 +87,35 @@ const STATUS_BORDER: Record<TaskStatus, string> = {
   ABORTED: '#94a3b8',
 };
 
-const STATUS_LABEL: Record<TaskStatus, string> = {
-  PENDING: '待办',
-  DISPATCHED: '已派发',
-  IN_PROGRESS: '进行中',
-  SUBMITTED: '已提交',
-  UNDER_REVIEW: '评审中',
-  REPAIR_REQUESTED: '需修复',
-  REPAIRING: '修复中',
-  APPROVED: '已通过',
-  DONE: '完成',
-  FAILED: '失败',
-  ABORTED: '已中止',
-};
+// BUG-FRONTEND-RT-4 follow-up (event 000031): previously a
+// hardcoded Chinese map. Now resolved via i18n at render time
+// using `planTask.status.<id>` keys. The planTask function is
+// called inside the PlanGraph component which holds the
+// useTranslation() t helper.
+function planTask(t: (k: string) => string, status: TaskStatus): string {
+  // Map TaskStatus → i18n key suffix. Kept here (not in the
+  // i18n file) because TaskStatus is a TypeScript type, not a
+  // translation key.
+  const map: Record<TaskStatus, string> = {
+    PENDING: 'pending',
+    DISPATCHED: 'dispatched',
+    IN_PROGRESS: 'inProgress',
+    SUBMITTED: 'submitted',
+    UNDER_REVIEW: 'underReview',
+    REPAIR_REQUESTED: 'repairRequested',
+    REPAIRING: 'repairing',
+    APPROVED: 'approved',
+    DONE: 'done',
+    FAILED: 'failed',
+    ABORTED: 'aborted',
+  };
+  return t(`planTask.status.${map[status]}`);
+}
 
 // ── Custom node component ────────────────────────────────────────
 
 function TaskNodeComponent({ data }: { data: Record<string, unknown> }) {
+  const { t } = useTranslation();
   const role = (data.owner_role as string) ?? 'default';
   const status = (data.status as TaskStatus) ?? 'PENDING';
   const bgColor = ROLE_COLORS[role] ?? ROLE_COLORS.default;
@@ -130,7 +143,7 @@ function TaskNodeComponent({ data }: { data: Record<string, unknown> }) {
           className="rounded-full px-1.5 py-0.5 text-[10px] uppercase"
           style={{ color: borderColor, backgroundColor: `${borderColor}20` }}
         >
-          {STATUS_LABEL[status]}
+          {planTask(t, status)}
         </span>
       </div>
       {data.est_tokens != null && (

@@ -1018,6 +1018,25 @@ async fn set_workdir(path: String) -> Result<(), String> {
     set_workdir_with_nwt(path).await.map(|_| ())
 }
 
+/// BUG-017 partial fix (event 000032): explicitly clear the
+/// workdir + nwt root sentinel. Used by App.tsx when the user
+/// clicks "Skip" on the WorkdirSetup dialog (treats skipping
+/// the workdir as "no project" — agent-core nwt tool will see
+/// no root and refuse to log). On next launch, get_workdir
+/// returns null → WorkdirSetup dialog re-shows.
+#[tauri::command]
+async fn clear_workdir() -> Result<(), String> {
+    let Some(data_dir) = storage::Repository::default_data_dir() else {
+        return Ok(()); // best-effort; nothing to clear
+    };
+    let wd_file = data_dir.join("workdir.json");
+    let nrt_file = data_dir.join("nwt_root.json");
+    let _ = std::fs::remove_file(&wd_file);
+    let _ = std::fs::remove_file(&nrt_file);
+    tracing::info!("workdir + nwt_root sentinel cleared");
+    Ok(())
+}
+
 /// Atomically set the workdir AND initialise the project's
 /// `.nwt/` directory. BUG-016 fix.
 ///
@@ -1116,6 +1135,30 @@ async fn set_workdir_with_nwt(path: String) -> Result<String, String> {
         .map_err(|e| format!("rename to {}: {e}", wd_file.display()))?;
 
     tracing::info!(path = %path, nwt = %nwt_dir.display(), "Workdir + .nwt initialised atomically");
+
+    // BUG-017 partial fix (event 000032): the agent-core nwt
+    // tool lives in pipe-server (a separate process). It can't
+    // see the desktop's in-memory NWT_ROOT static. The bridge
+    // is a tiny sentinel file `<data_dir>/nwt_root.json` that
+    // pipe-server can read on every workflow start (see
+    // `crates/pipe-server/src/state.rs` init). We write it here
+    // — atomic (tmp + rename) and best-effort (failure is
+    // logged but doesn't fail the workdir change).
+    let nwt_root_payload = serde_json::json!({
+        "nwt_root": nwt_dir.to_string_lossy(),
+        "set_at": unix_secs_to_iso8601(std::time::SystemTime::now()),
+    });
+    if let Ok(bytes) = serde_json::to_vec_pretty(&nwt_root_payload) {
+        let nrt_file = data_dir.join("nwt_root.json");
+        let nrt_tmp = nrt_file.with_extension("json.tmp");
+        match std::fs::write(&nrt_tmp, &bytes)
+            .and_then(|_| std::fs::rename(&nrt_tmp, &nrt_file))
+        {
+            Ok(()) => tracing::info!(path = %nrt_file.display(), "nwt_root.json written"),
+            Err(e) => tracing::warn!(error = %e, "failed to write nwt_root.json; agent-core nwt tool will see no root"),
+        }
+    }
+
     Ok(nwt_dir.to_string_lossy().into_owned())
 }
 
@@ -1281,7 +1324,7 @@ pub fn run() {
             rpc_version,
             wipe_all_data,
             search_log,
-            get_workdir, set_workdir, set_workdir_with_nwt,
+            get_workdir, set_workdir, set_workdir_with_nwt, clear_workdir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

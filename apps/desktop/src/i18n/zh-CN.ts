@@ -370,6 +370,17 @@ const zhCN = {
   'plugins.error': '错误: {{error}}',
   'plugins.retry': '重试',
   'plugins.emptyHint': '选择一个插件查看详情',
+  'planTask.status.pending': '待办',
+  'planTask.status.dispatched': '已派发',
+  'planTask.status.inProgress': '进行中',
+  'planTask.status.submitted': '已提交',
+  'planTask.status.underReview': '评审中',
+  'planTask.status.repairRequested': '需修复',
+  'planTask.status.repairing': '修复中',
+  'planTask.status.approved': '已通过',
+  'planTask.status.done': '完成',
+  'planTask.status.failed': '失败',
+  'planTask.status.aborted': '已中止',
 
 // ── Drift banner (Phase 5) ───────────────────────────
   'drift.message':

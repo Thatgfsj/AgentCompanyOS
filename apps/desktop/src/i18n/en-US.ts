@@ -373,6 +373,17 @@ const enUS: Translations = {
   'plugins.error': 'Error: {{error}}',
   'plugins.retry': 'Retry',
   'plugins.emptyHint': 'Select a plugin to see details',
+  'planTask.status.pending': 'Pending',
+  'planTask.status.dispatched': 'Dispatched',
+  'planTask.status.inProgress': 'In progress',
+  'planTask.status.submitted': 'Submitted',
+  'planTask.status.underReview': 'Under review',
+  'planTask.status.repairRequested': 'Needs fix',
+  'planTask.status.repairing': 'Repairing',
+  'planTask.status.approved': 'Approved',
+  'planTask.status.done': 'Done',
+  'planTask.status.failed': 'Failed',
+  'planTask.status.aborted': 'Aborted',
 
 // ── Drift banner (Phase 5) ───────────────────────────
   'drift.message':

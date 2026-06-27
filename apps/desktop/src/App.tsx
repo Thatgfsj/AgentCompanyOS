@@ -570,7 +570,13 @@ export function App() {
             console.error('[App] set_workdir_with_nwt failed:', e);
           }
         }}
-        onSkip={() => setWorkdir('')}
+        onSkip={async () => {
+          // BUG-017 partial fix (event 000032): also clear the
+          // nwt_root sentinel on the Rust side so pipe-server
+          // doesn't think the user has a project.
+          try { await invoke('clear_workdir'); } catch {}
+          setWorkdir(null);
+        }}
       />
     );
   }
@@ -760,7 +766,7 @@ export function App() {
                         ? t('workflow.status.running')
                         : t('workflow.status.idle')
                   }
-                  ago={busy ? '正在运行' : '空闲'}
+                  ago={busy ? t('roster.chief.speaking') : t('roster.chief.idle')}
                 />
 
                 <Card>

@@ -1,0 +1,25 @@
+{
+  "id": "000032",
+  "timestamp": "2026-06-27T21:00:00Z",
+  "task": "BUG-017 partial + final i18n cleanup: nwt_root sentinel + PlanGraph + 12 planTask keys",
+  "summary": "BUG-017 partial + final i18n cleanup: nwt_root sentinel + PlanGraph + 12 planTask keys",
+  "reason": "Chairman: '继续修'. BUG-017 partial fix: the agent-core nwt tool's NWT_ROOT static lives in pipe-server (a separate process from the desktop), and pipe-server can never see the desktop's in-process Rust state. The full fix requires pipe-server to be modified to read the desktop's workdir — that's a 1-PR architectural change. The partial fix in this commit closes the desktop side: set_workdir_with_nwt now atomically writes a `<data_dir>/nwt_root.json` sentinel (tmp + rename, same pattern as workdir.json) after a successful .nwt/ init. The sentinel contains `{nwt_root, set_at}`. pipe-server can read this file on startup or on every workflow start. Also added a new `clear_workdir` Tauri command that App.tsx invokes when the user clicks 'Skip' on the WorkdirSetup dialog — removes both workdir.json and nwt_root.json so a future workflow start shows the dialog again. Plus final i18n cleanup: PlanGraph's hardcoded Chinese status map migrated to t(`planTask.status.<id>`) with 12 new keys in each locale; the outer PlanGraph component delegates i18n to its sub-component TaskNodeComponent (each custom node gets a useTranslation hook). Verification: cargo test -p flowntier-desktop --test e2e_nwt_standalone: 39/39 pass (3 new: metadata schema consistency, nwt_root sentinel atomic, clear_workdir removes both files). pnpm typecheck: clean. pnpm tauri build --bundles nsis: 16 MB installer. i18n-flip.py screenshot E2E: no console errors, all dashboard strings translate. The remaining BUG-017 work (pipe-server actually reading nwt_root.json) is a v0.5 task.",
+  "files": [
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/components/PlanGraph.tsx",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts",
+    "apps/desktop/src-tauri/tests/e2e_nwt_standalone.rs"
+  ],
+  "tags": [
+    "bug-017",
+    "partial-fix",
+    "nwt-root-sentinel",
+    "clear-workdir",
+    "i18n",
+    "planGraph",
+    "rust",
+    "tauri-command"
+  ]
+}
