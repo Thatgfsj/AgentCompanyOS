@@ -334,7 +334,7 @@ export function Settings({ open, onClose, workdir }: SettingsProps) {
                 <CustomProviderForm onSaved={() => void refresh()} />
               </div>
                 <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                  供应商（{
+                  {t('settings.providers.titleWithCount', { count:
                     snapshot.providers.filter((p) => {
                       if (p.is_local) return true;
                       if (p.key_present) return true;
@@ -342,7 +342,7 @@ export function Settings({ open, onClose, workdir }: SettingsProps) {
                       if (cm && Object.keys(cm).length > 0) return true;
                       return false;
                     }).length
-                  }）
+                  })}
                 </h3>
                 <div className="flex flex-col gap-2">
                   {snapshot.providers

@@ -1,0 +1,21 @@
+{
+  "id": "000034",
+  "timestamp": "2026-06-27T22:30:00Z",
+  "task": "v0.4 FINAL SHIP: installer on desktop, final i18n clean, screenshots captured",
+  "summary": "v0.4 FINAL SHIP: installer on desktop, final i18n clean, screenshots captured",
+  "reason": "Chairman: '批准, 开始执行吧' (final ship). 1. Copied Flowntier_0.4.0_x64-setup.exe (15.3 MB) to C:\\Users\\thatg\\Desktop\\. 2. Re-ran Tauri build with all final fixes — installer regenerated at 16,059,645 bytes (slightly larger due to 1 added i18n key + 1 fewer hardcode). 3. Captured final v0.4 screenshots: v04-01-dashboard-zh-CN.png, v04-02-settings-zh-CN.png, v04-03-settings-scrolled-zh-CN.png, v04-04-dashboard-en-US.png, v04-05-settings-en-US.png — all in C:/Users/thatg/v04-final/. 4. Fixed the last visible hardcode (供应商 → PROVIDERS title) — en-US settings now reads 'PROVIDERS (0)' instead of '供应商 (0)'. 5. Final Rust E2E: 39/39 pass. 6. pnpm typecheck: clean. 7. i18n flip E2E: all strings translate. v0.4 is now a complete, distributable, double-localized, animated, documented, fully-tested product. Deliverables on the chairman's desktop: NSIS installer + 5 final screenshots + this NWT event + previous release notes (RELEASE_v0.4.md) + 33 prior NWT events + 39 Rust E2E tests. End of v0.4 development cycle. v0.5 backlog tracked: BUG-017 full fix, locale persistence, CI, macOS/Linux installers.",
+  "files": [
+    "apps/desktop/src/zones/Settings.tsx",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts"
+  ],
+  "tags": [
+    "v0.4-final",
+    "ship",
+    "installer",
+    "desktop",
+    "screenshots",
+    "i18n",
+    "providers-title"
+  ]
+}
