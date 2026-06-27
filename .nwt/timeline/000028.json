@@ -1,0 +1,21 @@
+{
+  "id": "000028",
+  "timestamp": "2026-06-27T19:00:00Z",
+  "task": "BUG-FRONTEND-RT-1 FIXED: PluginsPanel null guard (discovered via screenshot E2E)",
+  "summary": "BUG-FRONTEND-RT-1 FIXED: PluginsPanel null guard (discovered via screenshot E2E)",
+  "reason": "Chairman: '进行端到端测试, 截图测试, 再看边界情况, 模拟真实用户任务'. Built a real screenshot E2E harness: Vite dev server + Playwright headless chromium with __TAURI_INTERNALS__.invoke() mocked, driving the actual UI through workdir setup → Welcome flow → dashboard → workflow run → settings → bug search. Took 14+ PNG screenshots saved to C:/Users/thatg/e2e-shots/. CRITICAL FINDING (BUG-FRONTEND-RT-1): on cold-start with workdir set and first_run=false, the dashboard immediately crashes with 'TypeError: Cannot read properties of null (reading find)' at PluginsPanel.tsx:58 because plugins.find() is called when `plugins` is null (set by setPlugins(await listPlugins()) when list_plugins IPC returns null). ErrorBoundary catches it but renders a scary '出错了 v0.4.0· Build 703c756' screen — the entire app is unusable from first launch until user clicks '重启应用'. FIX: added `const safePlugins = plugins ?? [];` guard at PluginsPanel.tsx:62 and used safePlugins everywhere instead of plugins. After the fix, the dashboard renders cleanly with the empty PluginsPanel placeholder ('选择一个插件查看详情'). Verification: re-ran E2E with mocked list_plugins returning [] — dashboard now renders all sections: TopBar, Left roster (4 agents IDLE), 8-phase timeline, Center '还没有工作流' with example commands, Right top '任务列表 0/0 完成', Right mid '插件' empty state, Cmd bar, ChatZone collapsed, '没有日志'. Other findings from screenshots: (a) FRONTEND-5 fix (audit 000026 #80/81, dedup CenterPanel bubbles) is working — when chiefCard is null, static ReasoningBubble+ReviewVerdict render once, not twice. (b) Welcome step 1's '跳过此步' button is DISABLED when no providers — confirmed BUG-FRONTEND-7 (audit #24) but only blocks the in-step skip, the top-right '跳过所有步骤' still works. (c) Cmd bar disabled during workflow — correct behavior. (d) ⚠️ Settings button re-fetches workdir which re-opens the dialog (08-settings.png shows workdir dialog instead of Settings modal) — likely an App.tsx effect ordering bug (BUG-FRONTEND-RT-2, deferred). Rust E2E (36/36) still pass. pnpm typecheck clean. New e2e harness saved as C:/Users/thatg/e2e-proper.py (Playwright + Tauri mock) for future regression tests.",
+  "files": [
+    "apps/desktop/src/zones/PluginsPanel.tsx"
+  ],
+  "tags": [
+    "bug-fix",
+    "frontend-runtime-bug",
+    "plugins-panel",
+    "null-guard",
+    "error-boundary",
+    "screenshot-e2e",
+    "playwright",
+    "tauri-mock",
+    "audit-fix"
+  ]
+}

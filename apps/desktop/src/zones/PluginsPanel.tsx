@@ -55,13 +55,23 @@ export function PluginsPanel() {
   if (loading) return <Card><div className="text-sm text-text-secondary">加载插件中...</div></Card>;
   if (error) return <Card><div className="text-sm text-status-failed">错误: {error}</div><button onClick={fetchPlugins} className="mt-2 text-xs text-status-active hover:underline">重试</button></Card>;
 
-  const selected = plugins.find((p) => p.name === selectedPlugin);
+  // BUG-FRONTEND-RT-1 (event 000028): the previous code called
+  // `plugins.find(...)` without a null check. When `listPlugins()`
+  // returned null/undefined (e.g. backend not ready, malformed
+  // IPC response, or first call before fetch resolves), this
+  // crashed the entire dashboard with
+  // `TypeError: Cannot read properties of null (reading 'find')`,
+  // which ErrorBoundary caught and rendered a scary "出错了"
+  // screen — blocking the user from using the app. Now we
+  // default to an empty array.
+  const safePlugins = plugins ?? [];
+  const selected = safePlugins.find((p) => p.name === selectedPlugin);
 
   return (
     <Card>
       <h3 className="mb-2 text-sm font-semibold">插件</h3>
       <div className="mb-3 flex flex-wrap gap-1.5">
-        {plugins.map((p) => (
+        {safePlugins.map((p) => (
           <button key={p.name} type="button" onClick={() => { setSelectedPlugin(p.name); setSelectedAction(null); setResult(null); }}
             className={`rounded px-2 py-1 text-xs transition-colors ${selectedPlugin === p.name ? 'bg-status-active text-white' : 'bg-surface-3 text-text-secondary hover:bg-surface-2'}`}>
             {p.name}
