@@ -1132,6 +1132,26 @@ function ProviderModelManager({
 // ── Custom Provider (relay station) ─────────────────────────────
 
 
+// BUG-FRONTEND-RT-12 (event 000041): each model registered with
+// a custom provider now carries an optional context_length
+// (in tokens; e.g. 200000 for MiniMax-M3's 200k window) and a
+// required thinking_strength enum. The chairman's directive
+// was: "let the user fill in the model name + context length,
+// and pick thinking strength from a list".
+type ThinkingStrength = 'low' | 'medium' | 'high';
+interface ModelRow {
+  id: string;
+  display_name: string;
+  /** Context window size in tokens. null = use the runtime default. */
+  context_length: number | null;
+  thinking_strength: ThinkingStrength;
+}
+const THINKING_OPTIONS: { value: ThinkingStrength; labelKey: string }[] = [
+  { value: 'low',    labelKey: 'settings.models.thinking.low' },
+  { value: 'medium', labelKey: 'settings.models.thinking.medium' },
+  { value: 'high',   labelKey: 'settings.models.thinking.high' },
+];
+
 function CustomProviderForm({ onSaved }: { onSaved: () => void }) {
   const { t } = useTranslation();
   const KIND_OPTIONS = [
@@ -1139,15 +1159,22 @@ function CustomProviderForm({ onSaved }: { onSaved: () => void }) {
     { value: 'openai', label: t('settings.custom.kind.openai') },
     { value: 'openai_compat', label: 'OpenAI 兼容 (AI SDK)' },
   ] as const;
+  // BUG-FRONTEND-RT-12 (event 000041): each model now carries
+  // its own `context_length` (free-text int) + `thinking_strength`
+  // (one of 'low' | 'medium' | 'high'). Lets the chairman set
+  // per-model values (e.g. 200k context + high thinking for the
+  // flagship MiniMax-M3, 8k + low for a cheap fast model).
   const [open, setOpen] = useState(false);
   const [id, setId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [kind, setKind] = useState<'anthropic' | 'openai' | 'openai_compat'>('openai');
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [models, setModels] = useState<{ id: string; display_name: string }[]>([]);
+  const [models, setModels] = useState<ModelRow[]>([]);
   const [newModelId, setNewModelId] = useState('');
   const [newModelName, setNewModelName] = useState('');
+  const [newModelContext, setNewModelContext] = useState('');
+  const [newModelThinking, setNewModelThinking] = useState<ThinkingStrength>('medium');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -1155,6 +1182,7 @@ function CustomProviderForm({ onSaved }: { onSaved: () => void }) {
   const reset = () => {
     setId(''); setDisplayName(''); setKind('openai'); setBaseUrl('');
     setApiKey(''); setModels([]); setNewModelId(''); setNewModelName('');
+    setNewModelContext(''); setNewModelThinking('medium');
     setError(null); setSuccess(false);
   };
 
@@ -1162,8 +1190,31 @@ function CustomProviderForm({ onSaved }: { onSaved: () => void }) {
     const mid = newModelId.trim();
     if (!mid) return;
     if (models.some((m) => m.id === mid)) { setError(t('settings.models.modelExists', { id: mid })); return; }
-    setModels([...models, { id: mid, display_name: newModelName.trim() || mid }]);
-    setNewModelId(''); setNewModelName(''); setError(null);
+    // BUG-FRONTEND-RT-12: validate the free-text context length.
+    // Accept empty (= use provider default) or a positive int.
+    // Cap at 10M to keep the JSON reasonable.
+    let ctx: number | null = null;
+    const ctxRaw = newModelContext.trim();
+    if (ctxRaw.length > 0) {
+      const n = Number(ctxRaw);
+      if (!Number.isFinite(n) || n <= 0 || n > 10_000_000) {
+        setError(t('settings.models.invalidContextLength'));
+        return;
+      }
+      ctx = Math.floor(n);
+    }
+    setModels([
+      ...models,
+      {
+        id: mid,
+        display_name: newModelName.trim() || mid,
+        context_length: ctx,
+        thinking_strength: newModelThinking,
+      },
+    ]);
+    setNewModelId(''); setNewModelName(''); setNewModelContext('');
+    setNewModelThinking('medium');
+    setError(null);
   };
 
   const removeModelRow = (mid: string) => setModels(models.filter((m) => m.id !== mid));
@@ -1269,20 +1320,52 @@ function CustomProviderForm({ onSaved }: { onSaved: () => void }) {
           {models.length > 0 && (
             <ul className="flex flex-col gap-1">
               {models.map((m) => (
-                <li key={m.id} className="flex items-center gap-2 rounded bg-surface-2 px-2 py-1">
+                <li key={m.id} className="flex items-center gap-2 rounded bg-surface-2 px-2 py-1 text-[11px]">
                   <span className="min-w-0 flex-1 truncate text-primary" title={m.id}>
                     {m.display_name} <span className="text-[10px] text-text-secondary">({m.id})</span>
+                  </span>
+                  <span className="shrink-0 text-[10px] text-text-secondary">
+                    {m.context_length
+                      ? `${m.context_length.toLocaleString()} ${t('settings.models.tokens')}`
+                      : t('settings.models.defaultContext')}
+                  </span>
+                  <span className="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-text-primary">
+                    {t(`settings.models.thinking.${m.thinking_strength}`)}
                   </span>
                   <button type="button" onClick={() => removeModelRow(m.id)} className="shrink-0 text-[10px] text-red-400 hover:text-red-300">✕</button>
                 </li>
               ))}
             </ul>
           )}
-          <div className="flex gap-1.5">
-            <input value={newModelId} onChange={(e) => setNewModelId(e.target.value)} placeholder={t('settings.models.newModelId')} className="flex-1 rounded border border-border bg-surface-2 px-2 py-1 text-primary outline-none focus:border-chief" onKeyDown={(e) => e.key === 'Enter' && addModelRow()} />
-            <input value={newModelName} onChange={(e) => setNewModelName(e.target.value)} placeholder={t('settings.models.newModelName')} className="flex-1 rounded border border-border bg-surface-2 px-2 py-1 text-primary outline-none focus:border-chief" onKeyDown={(e) => e.key === 'Enter' && addModelRow()} />
+          {/* Per-model fields. Per the chairman: model name + display
+              name + context length (free text) + thinking strength
+              (dropdown). All four on one row to save space. */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <input value={newModelId} onChange={(e) => setNewModelId(e.target.value)} placeholder={t('settings.models.newModelId')} className="flex-1 min-w-[80px] rounded border border-border bg-surface-2 px-2 py-1 text-primary outline-none focus:border-chief" />
+            <input value={newModelName} onChange={(e) => setNewModelName(e.target.value)} placeholder={t('settings.models.newModelName')} className="flex-1 min-w-[80px] rounded border border-border bg-surface-2 px-2 py-1 text-primary outline-none focus:border-chief" />
+            <input
+              value={newModelContext}
+              onChange={(e) => setNewModelContext(e.target.value)}
+              placeholder={t('settings.models.contextPlaceholder')}
+              type="number"
+              min={0}
+              max={10_000_000}
+              className="w-20 rounded border border-border bg-surface-2 px-2 py-1 text-primary outline-none focus:border-chief"
+            />
+            <select
+              value={newModelThinking}
+              onChange={(e) => setNewModelThinking(e.target.value as ThinkingStrength)}
+              className="rounded border border-border bg-surface-2 px-2 py-1 text-primary outline-none focus:border-chief"
+            >
+              {THINKING_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
+              ))}
+            </select>
             <button type="button" onClick={addModelRow} className="shrink-0 rounded bg-surface-3 px-2 py-1 text-text-secondary hover:text-primary">+</button>
           </div>
+          <p className="text-[10px] text-text-secondary">
+            {t('settings.models.contextHint')}
+          </p>
         </div>
       </div>
 

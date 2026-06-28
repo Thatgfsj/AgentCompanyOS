@@ -1,0 +1,28 @@
+{
+  "id": "000040",
+  "timestamp": "2026-06-28T17:35:00Z",
+  "task": "v0.4.5: NSIS install conflict fix + MiniMax provider form overhaul (model+context+thinking)",
+  "summary": "v0.4.5: NSIS install conflict fix + MiniMax provider form overhaul (model+context+thinking)",
+  "reason": "Chairman reported two real issues in quick succession. (1) NSIS install error: '无法打开要写入的文件: O:\\Flowntier\\flowntier_runtime.exe' — the previous v0.4.x install put files at O:\\Flowntier\\ and a running instance is locking the sidecar binary. Fix: added apps/desktop/src-tauri/nsis/installer.nsi with a `customOnInit` (Tauri's reserved hook name) that uses Win32 Toolhelp32 (built into Windows since XP, no extra plugin dep) to find a running `flowntier.exe` and shows a topmost MessageBox asking the user to close it. First MessageBox build attempt failed with 'Function named .onInit already exists' — Tauri already defines .onInit. Switched to `customOnInit` (the documented extension point), which works. (2) MiniMax provider form: chairman asked to let the user fill in the model name + context length (free text), and pick thinking strength from a list. Replaced the single ModelRow {id, display_name} with the richer {id, display_name, context_length: number|null, thinking_strength: 'low'|'medium'|'high'}. New 'Models' form has 4 inline fields per row (id / name / context / thinking) + a 1-line hint. context_length validated as positive int ≤10M; thinking_strength is a <select> with low/medium/high options. Updated i18n keys: settings.models.{contextPlaceholder, contextHint, invalidContextLength, tokens, defaultContext, thinking.low/medium/high}. Also updated apps/desktop/src/lib/api.ts: ProviderModel type now has context_length + thinking_strength fields. Verification: pnpm typecheck clean, 39/39 Rust E2E pass, Tauri NSIS build produces Flowntier_0.4.5_x64-setup.exe (16,060,150 bytes = 15.3 MB) on the chairman's desktop. Screenshot evidence at C:/Users/thatg/v045-model-form/ shows the new form rendering with all 4 fields visible (id, name, context, thinking dropdown).",
+  "files": [
+    "apps/desktop/src-tauri/nsis/installer.nsi",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/src/zones/Settings.tsx",
+    "apps/desktop/src/lib/api.ts",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts",
+    "apps/desktop/package.json"
+  ],
+  "tags": [
+    "v0.4.5",
+    "nsis",
+    "installer-conflict",
+    "process-detection",
+    "toolhelp32",
+    "provider-form",
+    "minimax",
+    "context-length",
+    "thinking-strength",
+    "free-text-model-name"
+  ]
+}

@@ -118,6 +118,13 @@ export async function invokePlugin(name: string, args: Record<string, unknown>):
 export interface ProviderModel {
   id: string;
   display_name: string;
+  /** BUG-FRONTEND-RT-12 (event 000041): context window in
+   *  tokens. The chairman's directive: let the user fill in
+   *  this. Null/missing = use the runtime default. */
+  context_length?: number | null;
+  /** Reasoning effort. low=fast+cheap, medium=balanced,
+   *  high=deep+expensive. Default 'medium'. */
+  thinking_strength?: 'low' | 'medium' | 'high';
 }
 
 export interface FetchedModelsResult {

@@ -153,6 +153,14 @@ const zhCN = {
     '（暂无回退；主模型失败时该角色会直接报错）',
   'settings.models.newModelId': 'model-id',
   'settings.models.newModelName': '显示名(可选)',
+  'settings.models.contextPlaceholder': '上下文长度',
+  'settings.models.contextHint': '上下文长度以 token 计（可留空用默认值）。',
+  'settings.models.invalidContextLength': '上下文长度必须是 1 到 10,000,000 之间的正整数。',
+  'settings.models.tokens': 'tokens',
+  'settings.models.defaultContext': '默认上下文',
+  'settings.models.thinking.low': '低',
+  'settings.models.thinking.medium': '中',
+  'settings.models.thinking.high': '高',
 
   // ── CompatHints (per-provider 兼容接口 hint) ─────────
   'settings.compat.title': '兼容接口（任选其一）',

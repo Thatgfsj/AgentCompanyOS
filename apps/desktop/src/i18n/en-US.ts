@@ -155,6 +155,14 @@ const enUS: Translations = {
     '(No fallback yet; if the primary model fails, the role will return an error.)',
   'settings.models.newModelId': 'model-id',
   'settings.models.newModelName': 'Display name (optional)',
+  'settings.models.contextPlaceholder': 'Context length',
+  'settings.models.contextHint': 'Context length in tokens (leave blank to use the runtime default).',
+  'settings.models.invalidContextLength': 'Context length must be a positive integer between 1 and 10,000,000.',
+  'settings.models.tokens': 'tokens',
+  'settings.models.defaultContext': 'default context',
+  'settings.models.thinking.low': 'Low',
+  'settings.models.thinking.medium': 'Medium',
+  'settings.models.thinking.high': 'High',
 
   // ── CompatHints (per-provider 兼容接口 hint) ─────────
   'settings.compat.title': 'Compatible interfaces (pick one)',
