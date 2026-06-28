@@ -434,6 +434,26 @@ export function App() {
     if (event.kind === 'milestone' && event.label) {
       setMilestones((prev) => [...prev, event.label]);
     }
+    // BUG-FRONTEND-RT-14 (event 000043): the previous code
+    // only updated phaseStates for `transition` events. But
+    // the agent emits `milestone` events (status: started /
+    // completed). Without this branch, the 8-phase timeline
+    // dots never change — all 8 stay empty. We now also update
+    // phaseStates on milestone events: status='completed' marks
+    // the phase as 'done'; status='started' marks it as 'active'.
+    if (event.kind === 'milestone' && event.phase) {
+      const idx = PHASES.findIndex((p) => p.name === event.phase);
+      if (idx >= 0) {
+        const phaseName = event.phase as Phase['name'];
+        const ms = event as { status?: string };
+        const newState: PhaseState =
+          ms.status === 'completed' ? 'done' :
+          ms.status === 'started' || ms.status === 'in_progress' ? 'active' :
+          'pending';
+        setActivePhase(newState === 'active' ? idx : activePhase);
+        setPhaseStates((prev) => ({ ...prev, [phaseName]: newState }));
+      }
+    }
     if (event.kind === 'console' && event.agent_id) {
       if (event.agent_id === 'agent:chief') {
         setAgentStatus((prev) => ({ ...prev, chief: 'thinking' }));

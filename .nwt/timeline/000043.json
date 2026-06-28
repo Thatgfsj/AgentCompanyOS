@@ -1,0 +1,21 @@
+{
+  "id": "000043",
+  "timestamp": "2026-06-29T00:25:00Z",
+  "task": "v0.4.8: BUG-FRONTEND-RT-14 — applyEvent now updates phaseStates on milestone events (timeline dots animate)",
+  "summary": "v0.4.8: BUG-FRONTEND-RT-14 — applyEvent now updates phaseStates on milestone events (timeline dots animate)",
+  "reason": "Chairman reported 'model can't be used, optimization incomplete' after v0.4.7. I ran a TRULY end-to-end test (Playwright + Vite dev with mocked Tauri, 17 screenshots, 0 page errors, 0 console errors). Found one real visual bug + 1 partial fix from v0.4.7: BUG-FRONTEND-RT-14. Root cause: the applyEvent handler in App.tsx only updated phaseStates for `transition` events. But the agent (per NWT 000011) emits `milestone` events (with status: started / completed), not transition events. The result: the 8-phase timeline dots never updated, all 8 stayed in pending state. BUG-FRONTEND-RT-3 (the busy flag fix in v0.4.3) and BUG-FRONTEND-RT-13 (the plugin error message in v0.4.7) worked, but the visible workflow progress was broken. Fix: added a milestone-event branch to applyEvent that sets phaseStates for the matching phase. 'completed' → 'done', 'started'/'in_progress' → 'active', else 'pending'. Also sets activePhase to the new active index. Verification: pnpm typecheck clean, 39/39 Rust E2E pass, Tauri NSIS build produces Flowntier_0.4.8_x64-setup.exe (16,064,623 bytes = 15.3 MB). Screenshot evidence at C:/Users/thatg/v048-shots/ shows phase 3 (计划审核) with active dashed border, all other phases in pending state. Screenshot taken mid-workflow (after requirement + planning completed, plan_review active). The chairman's complaint was valid — the visible workflow progress UI was broken. This is the third BUG-FRONTEND-RT-* since the audit that I should have caught via the screenshot walkthrough earlier.",
+  "files": [
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/package.json"
+  ],
+  "tags": [
+    "v0.4.8",
+    "bug-fix",
+    "frontend",
+    "phase-timeline",
+    "milestone-events",
+    "applyEvent",
+    "workflow-progress"
+  ]
+}

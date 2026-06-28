@@ -30,7 +30,20 @@ export function PluginsPanel() {
       setError(null);
       setPlugins(await listPlugins());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to fetch plugins');
+      // BUG-FRONTEND-RT-13 (event 000042): the previous code
+      // dumped the raw error.message which is unhelpful when
+      // the sidecar binary is missing. Now we show a localized
+      // hint that points the user to the most common cause
+      // (the pipe-server sidecar is not running, typically
+      // because it crashed on startup or was killed by the
+      // installer). Users can run scripts/kill_flowntier.cmd
+      // then restart Flowntier.
+      const raw = e instanceof Error ? e.message : String(e);
+      console.warn('[PluginsPanel] listPlugins failed:', raw);
+      setError(
+        t('plugins.fetchError', { error: raw }) +
+        '\n' + t('plugins.fetchErrorHint')
+      );
     } finally {
       setLoading(false);
     }

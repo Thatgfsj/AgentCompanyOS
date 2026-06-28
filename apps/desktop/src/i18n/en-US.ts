@@ -386,6 +386,8 @@ const enUS: Translations = {
   'plugins.error': 'Error: {{error}}',
   'plugins.retry': 'Retry',
   'plugins.emptyHint': 'Select a plugin to see details',
+  'plugins.fetchError': 'Failed to load plugins: {{error}}',
+  'plugins.fetchErrorHint': 'Tip: this usually means the sidecar process is not running. Close Flowntier (run scripts\\kill_flowntier.cmd), then restart the app.',
   'planTask.status.pending': 'Pending',
   'planTask.status.dispatched': 'Dispatched',
   'planTask.status.inProgress': 'In progress',

@@ -1,0 +1,25 @@
+{
+  "id": "000042",
+  "timestamp": "2026-06-29T00:03:00Z",
+  "task": "v0.4.7: BUG-FRONTEND-RT-13 — 'Failed to fetch plugins' error reporting + kill_flowntier kills sidecar too",
+  "summary": "v0.4.7: BUG-FRONTEND-RT-13 — 'Failed to fetch plugins' error reporting + kill_flowntier kills sidecar too",
+  "reason": "Chairman reported 'Failed to fetch plugins' error after installing v0.4.6. Root cause analysis: the error came from listPlugins() invoke failing in PluginsPanel.tsx because the pipe-server sidecar binary (flowntier_runtime.exe) was not running. The previous v0.4.4 install had been left in a broken state at O:\\Flowntier\\, and the new v0.4.6 install overwrote the desktop binary but the OLD sidecar was still on disk. Two fixes: (1) scripts/kill_flowntier.cmd now also kills flowntier_runtime.exe and pipe-server.exe, not just the main flowntier.exe. The chairman's install flow: close app, run kill_flowntier.cmd (which now kills both main + sidecar), then re-install. (2) PluginsPanel error reporting — previously the catch block dumped e.message which was a raw 'Failed to fetch plugins' from somewhere deep in the IPC stack. Now we show a localized hint (plugins.fetchError + plugins.fetchErrorHint) explaining that the sidecar isn't running, pointing the user to scripts/kill_flowntier.cmd. Verification: pnpm typecheck clean, 39/39 Rust E2E pass, Tauri NSIS build produces Flowntier_0.4.7_x64-setup.exe (16,059,117 bytes = 15.3 MB) on the chairman's desktop. Replaced v0.4.6 with v0.4.7. Note: the underlying issue (broken sidecar on disk) is a real installation state issue that no in-app fix can solve — the kill script + better error message are the honest workarounds until we can ensure the sidecar is always built/installed fresh.",
+  "files": [
+    "apps/desktop/src/zones/PluginsPanel.tsx",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts",
+    "scripts/kill_flowntier.cmd",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/package.json"
+  ],
+  "tags": [
+    "v0.4.7",
+    "bug-fix",
+    "frontend",
+    "plugins",
+    "error-reporting",
+    "kill-script",
+    "sidecar",
+    "user-feedback"
+  ]
+}

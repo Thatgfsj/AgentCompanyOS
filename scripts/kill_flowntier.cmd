@@ -1,31 +1,37 @@
 @echo off
-REM BUG-FRONTEND-RT-11: the Flowntier NSIS installer cannot
-REM overwrite flowntier_runtime.exe while a previous Flowntier
-REM instance is running. This script terminates any running
-REM Flowntier process so the install can proceed. Run as
-REM Administrator if you installed to Program Files (we install
-REM to currentUser so admin shouldn't be needed).
+REM BUG-FRONTEND-RT-13: the Flowntier sidecar binary
+REM (flowntier_runtime.exe) was leaking between installs.
+REM Kill BOTH the main app and the sidecar so the install
+REM can overwrite both. Run as Administrator if you installed
+REM to Program Files (we install to currentUser so admin
+REM shouldn't be needed for the standard install path).
 
-echo Checking for running Flowntier process...
+echo Checking for running Flowntier processes...
 
+REM Main app
 tasklist /FI "IMAGENAME eq flowntier.exe" 2>NUL | find /I /N "flowntier.exe" >NUL
 if "%ERRORLEVEL%"=="0" (
-    echo Found Flowntier running. Terminating...
+    echo Found Flowntier main process. Terminating...
     taskkill /F /IM flowntier.exe
-    if "%ERRORLEVEL%"=="0" (
-        echo Flowntier process terminated.
-    ) else (
-        echo ERROR: Failed to terminate Flowntier.
-        echo Try running this script as Administrator.
-        exit /B 1
-    )
-) else (
-    echo No Flowntier process running.
+)
+
+REM Sidecar binary (Python runtime bridge)
+tasklist /FI "IMAGENAME eq flowntier_runtime.exe" 2>NUL | find /I /N "flowntier_runtime.exe" >NUL
+if "%ERRORLEVEL%"=="0" (
+    echo Found Flowntier sidecar process. Terminating...
+    taskkill /F /IM flowntier_runtime.exe
+)
+
+REM Also kill any pipe-server lingering process
+tasklist /FI "IMAGENAME eq pipe-server.exe" 2>NUL | find /I /N "pipe-server.exe" >NUL
+if "%ERRORLEVEL%"=="0" (
+    echo Found pipe-server process. Terminating...
+    taskkill /F /IM pipe-server.exe
 )
 
 REM Give the OS a moment to release file handles
-timeout /T 1 /NOBREAK >NUL
+timeout /T 2 /NOBREAK >NUL
 
 echo.
-echo You can now run the Flowntier installer.
+echo All Flowntier processes terminated. You can now run the installer.
 pause
