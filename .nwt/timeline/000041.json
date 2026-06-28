@@ -1,0 +1,21 @@
+{
+  "id": "000041",
+  "timestamp": "2026-06-28T23:45:00Z",
+  "task": "v0.4.6: NSIS install conflict — accept defeat, ship kill_flowntier.cmd helper instead",
+  "summary": "v0.4.6: NSIS install conflict — accept defeat, ship kill_flowntier.cmd helper instead",
+  "reason": "Chairman reported v0.4.5 still fails to install with 'Cannot open file: O:\\\\Flowntier\\\\flowntier_runtime.exe'. Root cause: my v0.4.5 attempt to inject a customOnInit NSIS hook (in apps/desktop/src-tauri/nsis/installer.nsi) FAILED — the file was included (line 28 of the generated installer.nsi has the !include directive) but the CONTENTS were never inlined. Verified: `grep -c 'FindProcess\\\\|customOnInit' target/release/nsis/x64/installer.nsi` returns 0. Tauri 2.x's NSIS preprocessor apparently silently drops the include or processes it at a stage that doesn't end up in the final binary. I tried `customOnInit` (the documented Tauri extension point) but it never runs because NSIS doesn't auto-invoke macros. I cannot easily override Tauri macros without forking the Tauri source. Pragmatic fix: (1) removed the dead NSIS file + the `installerHooks` config key (it was a lie — that key doesn't exist in Tauri 2.x). (2) added scripts/kill_flowntier.cmd — a small Windows CMD script that uses `tasklist` / `taskkill` to terminate any running Flowntier instance. Chairman can run this before re-installing. (3) bumped version to 0.4.6. The build succeeds (15.3 MB) but does NOT include any in-installer conflict detection. The helper script is the workaround. Note: the real long-term fix is for Tauri 2.x to expose a proper installer-hook API, or for me to use a WiX bundle instead (WiX has richer pre-install hooks but requires the wix toolchain). Both are v0.5 work. Honesty: my v0.4.5 fix was wrong, the helper script is the honest fix for now.",
+  "files": [
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/package.json",
+    "scripts/kill_flowntier.cmd"
+  ],
+  "tags": [
+    "v0.4.6",
+    "nsis",
+    "install-conflict",
+    "honest-fix",
+    "helper-script",
+    "Tauri-2.x-limit",
+    "documentation-only"
+  ]
+}

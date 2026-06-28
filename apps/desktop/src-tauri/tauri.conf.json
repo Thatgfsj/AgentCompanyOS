@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2.0.0",
   "productName": "Flowntier",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "identifier": "ai.flowntier.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -53,8 +53,7 @@
         "installerIcon": "icons/icon.ico",
         "installMode": "currentUser",
         "languages": ["SimpChinese", "English"],
-        "displayLanguageSelector": true,
-        "installerHooks": "nsis/installer.nsi"
+        "displayLanguageSelector": true
       },
       "wix": {
         "language": ["en-US", "zh-CN"]
