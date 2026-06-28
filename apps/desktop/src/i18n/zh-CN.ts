@@ -384,7 +384,7 @@ const zhCN = {
   'plugins.retry': '重试',
   'plugins.emptyHint': '选择一个插件查看详情',
   'plugins.fetchError': '加载插件失败: {{error}}',
-  'plugins.fetchErrorHint': '提示: 这通常意味着 sidecar 进程没在运行。先关掉 Flowntier（运行 scripts\\kill_flowntier.cmd），再重新启动应用。',
+  'plugins.fetchErrorHint': '提示: 这通常意味着后端没有 /api/plugins 接口。在 v0.4.9+ 插件系统由 Rust 进程直接处理，不再需要 sidecar。如果 v0.4.9+ 仍出现此错误，请上报 bug。',
   'planTask.status.pending': '待办',
   'planTask.status.dispatched': '已派发',
   'planTask.status.inProgress': '进行中',

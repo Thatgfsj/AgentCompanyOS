@@ -387,7 +387,7 @@ const enUS: Translations = {
   'plugins.retry': 'Retry',
   'plugins.emptyHint': 'Select a plugin to see details',
   'plugins.fetchError': 'Failed to load plugins: {{error}}',
-  'plugins.fetchErrorHint': 'Tip: this usually means the sidecar process is not running. Close Flowntier (run scripts\\kill_flowntier.cmd), then restart the app.',
+  'plugins.fetchErrorHint': 'Tip: this usually means the backend does not have a /api/plugins endpoint. From v0.4.9+ the plugin system is handled directly by the Rust process and does not require the sidecar. If you still see this error on v0.4.9+, please file a bug.',
   'planTask.status.pending': 'Pending',
   'planTask.status.dispatched': 'Dispatched',
   'planTask.status.inProgress': 'In progress',

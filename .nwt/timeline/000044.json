@@ -1,0 +1,24 @@
+{
+  "id": "000044",
+  "timestamp": "2026-06-29T00:45:00Z",
+  "task": "v0.4.9: list_plugins + invoke_plugin now in-process (no sidecar roundtrip) + error hint no longer blames the user",
+  "summary": "v0.4.9: list_plugins + invoke_plugin now in-process (no sidecar roundtrip) + error hint no longer blames the user",
+  "reason": "Chairman correctly pointed out that v0.4.8's error hint '提示: 这通常意味着 sidecar 进程没在运行。先关掉 Flowntier（运行 scripts\\\\kill_flowntier.cmd），再重新启动应用。' is a bad UX — we cannot ask the user to run a helper script every time the plugin panel renders. Root cause: list_plugins and invoke_plugin in lib.rs were proxying through the sidecar binary via pipe_request('GET', '/api/plugins', None). The sidecar doesn't have a /api/plugins handler (the plugin system is a skeleton with no real plugins). The sidecar returns 404 'no handler registered for path /api/plugins', which the frontend displayed as 'Failed to fetch plugins' with the kill-script hint. Fix (BUG-FRONTEND-RT-13): list_plugins now returns `Ok(serde_json::json!([]))` directly from the Rust shell, no sidecar roundtrip needed. invoke_plugin returns a graceful 'Plugin not registered' error (the plugin system is a v0.5 feature). Also updated the error hint: zh-CN now reads '提示: 这通常意味着后端没有 /api/plugins 接口。在 v0.4.9+ 插件系统由 Rust 进程直接处理，不再需要 sidecar。如果 v0.4.9+ 仍出现此错误，请上报 bug。' and en-US mirrors the same. The user is no longer asked to run scripts. Verification: 39/39 Rust E2E pass, pnpm typecheck clean, Tauri NSIS build produces Flowntier_0.4.9_x64-setup.exe (16,062,024 bytes = 15.3 MB) on the chairman's desktop. Replaced v0.4.8 with v0.4.9. The plugin panel in v0.4.9 will now show 'No plugins available' (empty list) instead of the error message — which is the correct UX since the plugin system is a v0.5 feature.",
+  "files": [
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/package.json"
+  ],
+  "tags": [
+    "v0.4.9",
+    "bug-fix",
+    "list_plugins",
+    "invoke_plugin",
+    "sidecar-removal",
+    "user-feedback",
+    "honest-error-msg",
+    "no-blame"
+  ]
+}
