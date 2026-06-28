@@ -327,6 +327,7 @@ const zhCN = {
   'app.chatCollapse': '▾ 折叠',
   'app.chatExpand': '直接驱动 agent-core · 点这里展开',
   'app.reset': '重置',
+  'app.workdirWriteFailed': '写入工作目录失败：{{error}}。请检查路径是否可写，或选择其他目录。',
   'connection.checking': '正在连接 runtime...',
   'connection.notConnected': '未连接 runtime — Python 端启动中，请稍候',
   'connection.detecting': '检测中...',

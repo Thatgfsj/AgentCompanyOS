@@ -198,6 +198,22 @@ export function App() {
   // project sub-directories without a workdir to put them in).
   const [workdir, setWorkdir] = useState<string | null>(null);
   const [workdirReady, setWorkdirReady] = useState(false);
+  // BUG-FRONTEND-RT-9 (event 000039): the workdirSkipped flag
+  // is read on mount to remember the user's previous "skip
+  // workdir" choice across launches. MUST be declared BEFORE
+  // any early-return `if` block, otherwise React throws
+  // "Rendered more hooks than during the previous render"
+  // (BUG-FRONTEND-RT-10). Hooks must always be called in the
+  // same order on every render.
+  const [workdirSkipped, setWorkdirSkipped] = useState(false);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const r = await invoke<{ k: string; v: unknown }>('kv_get', { key: 'workdir_skipped' });
+        if (r && r.v === true) setWorkdirSkipped(true);
+      } catch {}
+    })();
+  }, []);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -548,9 +564,10 @@ export function App() {
   }
   // Step 1: workdir not set. Show the WorkdirSetup dialog (mandatory
   // on first launch). User can either pick a directory or skip
-  // for now (advanced users); if skipped, workdir is "" and the
-  // dialog re-shows on next launch.
-  if (workdir === null) {
+  // for now (advanced users); if skipped, we record the skip
+  // intent in kv and route the user to the dashboard anyway
+  // (workdir stays null so the agent knows there's no project).
+  if (workdir === null && !workdirSkipped) {
     return (
       <WorkdirSetup
         initialPath=""
@@ -568,14 +585,28 @@ export function App() {
             setWorkdir(p);
           } catch (e) {
             console.error('[App] set_workdir_with_nwt failed:', e);
+            // BUG-FRONTEND-RT-8 (event 000039): surface the
+            // error to the user so they know the data dir write
+            // failed. Previously we just `console.error`d and the
+            // dialog dismissed silently, leaving the user confused
+            // about why nothing happened.
+            alert(t('app.workdirWriteFailed', { error: String(e) }));
           }
         }}
         onSkip={async () => {
-          // BUG-017 partial fix (event 000032): also clear the
-          // nwt_root sentinel on the Rust side so pipe-server
-          // doesn't think the user has a project.
+          // BUG-FRONTEND-RT-9 (event 000039): the previous
+          // `setWorkdir(null)` put the app in an infinite re-render
+          // loop because the WorkdirSetup dialog kept appearing
+          // on every render when workdir was null. Now we record
+          // the skip intent in kv (so it survives reload) and
+          // set `workdirSkipped` to route the user to the
+          // dashboard despite the null workdir.
+          try { await invoke('kv_set', { key: 'workdir_skipped', value: true }); } catch {}
           try { await invoke('clear_workdir'); } catch {}
-          setWorkdir(null);
+          setWorkdirSkipped(true);
+          // Do NOT setWorkdir(null) — workdir stays null, but the
+          // skip flag tells the render condition to bypass the
+          // WorkdirSetup dialog and go straight to the dashboard.
         }}
       />
     );

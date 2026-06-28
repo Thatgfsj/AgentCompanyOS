@@ -330,6 +330,7 @@ const enUS: Translations = {
   'app.chatCollapse': '▾ Collapse',
   'app.chatExpand': 'Direct agent-core driver · click to expand',
   'app.reset': 'Reset',
+  'app.workdirWriteFailed': 'Failed to write workdir: {{error}}. Please check the path is writable, or pick a different directory.',
   'connection.checking': 'Connecting to runtime...',
   'connection.notConnected': 'Runtime not connected — Python side is starting, please wait',
   'connection.detecting': 'Detecting...',

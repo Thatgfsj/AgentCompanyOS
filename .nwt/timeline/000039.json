@@ -1,0 +1,23 @@
+{
+  "id": "000039",
+  "timestamp": "2026-06-28T17:05:00Z",
+  "task": "v0.4.4: fix WorkdirSetup skip infinite loop + React hooks crash",
+  "summary": "v0.4.4: fix WorkdirSetup skip infinite loop + React hooks crash",
+  "reason": "Chairman: '安装的时候出现数据无法写入的问题, 选择工作目录的时候无法跳过' (data cannot be written during install, can't skip workdir dialog). Two real bugs found + 1 root cause: (1) BUG-FRONTEND-RT-9: '稍后设置' button caused an INFINITE RE-RENDER LOOP. The old onSkip set workdir=null which triggered WorkdirSetup on every render. Fix: persist a `workdir_skipped` flag in kv via `kvSet('workdir_skipped', true)`, and the render condition now checks `if (workdir === null && !workdirSkipped)`. After skip, the user goes to the dashboard (or Welcome if firstRun) and the dialog stays gone. (2) BUG-FRONTEND-RT-10: the 'data cannot be written' error was actually a CRASH that made the UI non-functional: 'Rendered more hooks than during the previous render' — a classic React Rules of Hooks violation. The new useState/useEffect for workdirSkipped was placed AFTER the `if (!workdirReady) return <div/>` early-return at line 546. On first render workdirReady=false (0 new hooks called). On second render workdirReady=true (2 new hooks called). React threw the rules-of-hooks error. Chairman saw this as 'data cannot be written' because the UI was completely broken. Fix: moved the new hooks BEFORE the early return, next to the other useState/useEffect calls. (3) BUG-FRONTEND-RT-8: when set_workdir_with_nwt fails, the catch block only console.error'd. Now we also alert the user with `t('app.workdirWriteFailed', { error })` so the data write failure is visible instead of silently failing. Verification: pnpm typecheck clean, 39/39 Rust E2E pass, screenshot E2E shows the Skip now correctly routes to Welcome (no ErrorBoundary crash, no infinite loop), Tauri NSIS build produces Flowntier_0.4.4_x64-setup.exe (16,058,035 bytes = 15.3 MB) which is on the chairman's desktop. v0.4.3 was actually broken in production — anyone installing it would see the '出错了 v0.4.2' crash screen on first launch. v0.4.4 fixes that.",
+  "files": [
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/package.json"
+  ],
+  "tags": [
+    "v0.4.4",
+    "bug-fix",
+    "react-hooks",
+    "infinite-loop",
+    "rules-of-hooks",
+    "data-write-error",
+    "ux-fix"
+  ]
+}
