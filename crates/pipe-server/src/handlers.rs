@@ -265,7 +265,7 @@ fn register_placeholder_handlers(d: &mut Dispatcher, state: Arc<ServerState>) {
             let name = body.get("name").and_then(|v| v.as_str())
                 .ok_or_else(|| "missing 'name' in path".to_string())?.to_string();
             match s.secrets.reveal(&name).await {
-                Ok(value) => Ok((200, json!({ "name": name, "value": value }))),
+                Ok(value) => Ok((200, json!({ "name": name, "value": value.as_str() }))),
                 Err(crate::secrets::SecretStoreError::NotFound(_)) => {
                     Ok((404, json!({ "error": "not found", "name": name })))
                 }
@@ -719,7 +719,7 @@ async fn list_models(
         .build()
         .map_err(|e| format!("reqwest build: {e}"))?;
     let resp = client.get(&url)
-        .header("Authorization", format!("Bearer {api_key}"))
+        .header("Authorization", format!("Bearer {}", api_key.as_str()))
         .send()
         .await
         .map_err(|e| format!("GET {url}: {e}"))?;
@@ -892,7 +892,7 @@ async fn refresh_stale_caches(state: &Arc<ServerState>) -> usize {
                 .build()
             {
                 if let Ok(resp) = client.get(&url)
-                    .header("Authorization", format!("Bearer {api_key}"))
+                    .header("Authorization", format!("Bearer {}", api_key.as_str()))
                     .send().await
                 {
                     if resp.status().is_success() {

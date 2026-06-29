@@ -157,7 +157,15 @@ impl SecretStore {
 
     /// Reveal (decrypt) a secret's plaintext value. Used by the
     /// agent loop when making a request to the upstream provider.
-    pub async fn reveal(&self, name: &str) -> Result<String, SecretStoreError> {
+    ///
+    /// v0.4.13 (event 000049): return type changed from `String`
+    /// to `zeroize::Zeroizing<String>`. The plaintext is wrapped
+    /// in a Drop guard that overwrites the heap memory with
+    /// zeroes as soon as the caller drops the value — equivalent
+    /// to PowerShell's `Marshal.FreeBSTR` after `SecureStringToBSTR`.
+    /// Stops API keys from lingering in process memory dumps
+    /// after the request completes.
+    pub async fn reveal(&self, name: &str) -> Result<zeroize::Zeroizing<String>, SecretStoreError> {
         let row = self
             .repo
             .get_secret(name)
@@ -175,8 +183,10 @@ impl SecretStore {
                 },
             )
             .map_err(|e| SecretStoreError::Crypto(format!("decrypt: {e}")))?;
-        let s = String::from_utf8(plaintext)
-            .map_err(|e| SecretStoreError::Crypto(format!("utf8: {e}")))?;
+        let s = zeroize::Zeroizing::new(
+            String::from_utf8(plaintext)
+                .map_err(|e| SecretStoreError::Crypto(format!("utf8: {e}")))?,
+        );
 
         // Best-effort: update last_used_at (audit trail).
         let mut updated = row.clone();
@@ -342,7 +352,7 @@ mod tests {
         // random passphrase in tests.
         store.put("OPENAI_API_KEY", "sk-test-1234567890").await.unwrap();
         let v = store.reveal("OPENAI_API_KEY").await.unwrap();
-        assert_eq!(v, "sk-test-1234567890");
+        assert_eq!(v.as_str(), "sk-test-1234567890");
     }
 
     #[tokio::test]

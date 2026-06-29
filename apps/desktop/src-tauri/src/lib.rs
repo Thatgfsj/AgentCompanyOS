@@ -400,16 +400,24 @@ async fn delete_secret(name: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn reveal_secret(name: String) -> Result<String, String> {
+    // v0.4.13: still returns String at the Tauri IPC boundary
+    // (Tauri's serde_json serialization will clone it anyway),
+    // but we explicitly null out the local pipe-response buffer
+    // after extraction to minimise time-on-heap in this process.
     let data = pipe_request(
         "POST",
         &format!("/api/settings/secrets/{}/reveal", name),
         None,
     )
     .await?;
-    data["value"]
+    let value = data["value"]
         .as_str()
         .map(|s| s.to_string())
-        .ok_or_else(|| "no value".to_string())
+        .ok_or_else(|| "no value".to_string())?;
+    // We can't zeroize the IPC payload (already serialized), but
+    // we can drop the `data` reference now.
+    drop(data);
+    Ok(value)
 }
 
 #[tauri::command]

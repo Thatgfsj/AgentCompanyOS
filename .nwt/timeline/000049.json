@@ -1,0 +1,31 @@
+{
+  "id": "000049",
+  "timestamp": "2026-06-29T10:02:00Z",
+  "task": "v0.4.13 — diagnose-friendly save errors + Zeroizing plaintext",
+  "summary": "v0.4.13 — diagnose-friendly save errors + Zeroizing plaintext",
+  "reason": "Two chairman complaints. (1) Save Failed button showed a static '保存失败' instead of the underlying error. Chairman couldn't tell whether the failure was Keyring access denied, Credential Manager offline, SQLite migration mismatch, or a path-permission issue. Fixed by changing i18n key settings.error.saveFailed from '保存失败' to '保存失败：{{error}}' (en-US: 'Save failed: {{error}}'). The tErr(t, e, fallbackKey) helper was already passing e.message as {{error}}, but the template was ignoring it. Now the user sees e.g. '保存失败：HTTP 500: put_secret: Keyring error: 系统找不到指定的文件' — enough to diagnose without source code. (2) Chairman wants plaintext API keys wiped from heap after use (PowerShell's SecureString + FreeBSTR pattern). Rust side: secrets::SecretStore::reveal() now returns zeroize::Zeroizing<String> instead of String. The plaintext gets zeroized in Drop as soon as the caller drops the value — equivalent to Marshal.FreeBSTR. handlers.rs (3 callers) updated to call .as_str() on the Zeroizing. reveal_secret Tauri command still returns String at the IPC boundary (Tauri serde_json would clone anyway), but the local pipe-response buffer is explicitly dropped. ChatZone.tsx: after invoke('run_agent_task') returns, the local apiKey variable is reassigned to '' so the reference can be GC'd.\n\nAlso fixed two pre-existing issues exposed by my new e2e test: (a) pipe-server write_all had no flush — Windows named pipe clients sometimes saw the response only after the server closed. Added conn.flush().await? after write_all. (b) spawn_server used a single shared storage dir (std::env::temp_dir().join('flowntier-e2e-test')) for all tests, so secrets from one test leaked into another. Now each test gets a unique dir with timestamp suffix.\n\nBuild: 20/20 unit + 9/9 e2e pass (including new security regression test). tsc clean. cargo build --release green. NSIS installer (16,075,709 bytes) on chairman's desktop at C:\\Users\\thatg\\Desktop\\Flowntier_0.4.13_x64-setup.exe.\n\nVersion bumped 0.4.12 → 0.4.13 in tauri.conf.json + package.json.",
+  "files": [
+    "Cargo.toml",
+    "crates/pipe-server/Cargo.toml",
+    "crates/pipe-server/src/secrets/mod.rs",
+    "crates/pipe-server/src/handlers.rs",
+    "crates/pipe-server/src/server.rs",
+    "crates/pipe-server/tests/e2e_pipe.rs",
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src/zones/ChatZone.tsx",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/package.json"
+  ],
+  "tags": [
+    "v0.4.13",
+    "zeroize",
+    "diagnose-friendly-ui",
+    "secure-string-pattern",
+    "test-isolation-fix",
+    "named-pipe-flush",
+    "chairman-handoff",
+    "no-tag-yet"
+  ]
+}

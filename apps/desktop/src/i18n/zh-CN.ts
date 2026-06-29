@@ -196,7 +196,7 @@ const zhCN = {
   'settings.about.changeWorkdirError': '更换失败：{{error}}',
   'settings.about.currentWorkdir': '当前工作目录',
   // ── Error fallbacks (Polish 12) ──────────────────
-  'settings.error.saveFailed': '保存失败',
+  'settings.error.saveFailed': '保存失败：{{error}}',
   'settings.error.alreadyExists': '模型 {{id}} 已存在',
   'settings.error.invalidId': 'ID 只能包含小写字母、数字和下划线',
   'settings.error.missingApiKey': '请填写 API Key',

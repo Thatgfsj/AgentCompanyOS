@@ -145,6 +145,11 @@ export function ChatZone({
           api_key: apiKey,
         },
       });
+      // v0.4.13: drop the plaintext from this closure's scope as
+      // soon as the IPC round-trip finishes. We can't actually
+      // zeroize JS strings (V8 owns the heap), but reassigning
+      // removes the reference so it can be GC'd promptly.
+      apiKey = '';
       if (!ok?.ok) {
         setError(ok?.error ?? '运行时未确认成功');
       }

@@ -30,6 +30,7 @@ rand         = "0.8"
 parking_lot  = { workspace = true }
 keyring      = { workspace = true }
 aes-gcm      = { workspace = true }
+zeroize      = { workspace = true }
 base64       = "0.22"
 chrono       = { workspace = true }
 reqwest      = { workspace = true }

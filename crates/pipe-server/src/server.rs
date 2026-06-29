@@ -235,6 +235,7 @@ async fn serve_rpc_connection(
         out.push(b'\n');
         drop(reader);
         conn.write_all(&out).await?;
+        conn.flush().await?;
         reader = BufReader::new(&mut conn);
     }
 }

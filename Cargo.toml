@@ -89,6 +89,11 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 aes-gcm = "0.10"
 rand = "0.8"
 
+# Zeroizing wrapper for in-memory plaintext (chairman-requested:
+# reveal() must not leave the API key sitting on the heap
+# unmasked after use).
+zeroize = { version = "1.8", features = ["zeroize_derive"] }
+
 # PTY
 portable-pty = "0.8"
 

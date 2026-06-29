@@ -198,7 +198,7 @@ const enUS: Translations = {
   'settings.about.changeWorkdirError': 'Change failed: {{error}}',
   'settings.about.currentWorkdir': 'Current work directory',
   // ── Error fallbacks (Polish 12) ──────────────────
-  'settings.error.saveFailed': 'Save failed',
+  'settings.error.saveFailed': 'Save failed: {{error}}',
   'settings.error.alreadyExists': 'Model {{id}} already exists',
   'settings.error.invalidId': 'ID may only contain lowercase letters, digits, and underscore',
   'settings.error.missingApiKey': 'Please enter an API key',
