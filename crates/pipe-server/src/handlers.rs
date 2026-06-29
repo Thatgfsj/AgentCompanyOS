@@ -654,6 +654,7 @@ async fn list_models(
             let models: Vec<Value> = serde_json::from_str(&cached.models_json)
                 .unwrap_or_else(|_| Vec::new());
             return Ok((200, json!({
+                "ok": true,
                 "provider_id": id,
                 "models": models,
                 "cached": true,
@@ -673,7 +674,10 @@ async fn list_models(
         let custom = match state.repo.get_custom_provider(&id).await
             .map_err(|e| format!("get_custom: {e}"))? {
             Some(c) => c,
-            None => return Ok((404, json!({ "error": format!("unknown provider: {id}") }))),
+            None => return Ok((404, json!({
+                "ok": false,
+                "error": format!("unknown provider: {id}"),
+            }))),
         };
         (custom.base_url.clone(), custom.kind == "openai-compatible")
     };
@@ -704,6 +708,7 @@ async fn list_models(
             fetched_at: chrono::Utc::now().timestamp(),
         }).await;
         return Ok((200, json!({
+            "ok": true,
             "provider_id": id,
             "models": models,
             "cached": false,
@@ -721,33 +726,60 @@ async fn list_models(
     let api_key = match state.secrets.reveal(&secret_name).await {
         Ok(k) => k,
         Err(crate::secrets::SecretStoreError::NotFound(_)) => {
-            return Ok((401, json!({
+            return Ok((200, json!({
+                "ok": false,
                 "error": "no API key configured",
                 "secret_name": secret_name,
+                "url": url,
+                "provider_id": id,
             })));
         }
-        Err(e) => return Ok((500, json!({ "error": format!("reveal: {e}") }))),
+        Err(e) => return Ok((200, json!({
+            "ok": false,
+            "error": format!("reveal: {e}"),
+            "provider_id": id,
+        }))),
     };
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
         .build()
         .map_err(|e| format!("reqwest build: {e}"))?;
-    let resp = client.get(&url)
+    let resp = match client.get(&url)
         .header("Authorization", format!("Bearer {}", api_key.as_str()))
         .send()
         .await
-        .map_err(|e| format!("GET {url}: {e}"))?;
-    let status = resp.status();
-if !status.is_success() {
-            return Ok((status.as_u16(), json!({
-                "error": format!("provider returned {status}"),
+    {
+        Ok(r) => r,
+        Err(e) => {
+            return Ok((200, json!({
+                "ok": false,
+                "error": format!("network error: {e}"),
                 "url": url,
                 "provider_id": id,
             })));
         }
-        let body: Value = resp.json().await
-            .map_err(|e| format!("parse {url}: {e}"))?;
+    };
+    let status = resp.status();
+    if !status.is_success() {
+        return Ok((200, json!({
+            "ok": false,
+            "error": format!("provider returned {status}"),
+            "url": url,
+            "provider_id": id,
+        })));
+    }
+    let body: Value = match resp.json().await {
+        Ok(b) => b,
+        Err(e) => {
+            return Ok((200, json!({
+                "ok": false,
+                "error": format!("parse {url}: {e}"),
+                "url": url,
+                "provider_id": id,
+            })));
+        }
+    };
     // OpenAI-compatible /models response shape:
     // { "object": "list", "data": [{ id, object, ... }, ...] }
     let models: Vec<Value> = body.get("data")
@@ -764,13 +796,14 @@ if !status.is_success() {
         models_json: body_str,
         fetched_at: chrono::Utc::now().timestamp(),
     }).await;
-Ok((200, json!({
-            "provider_id": id,
-            "models": models,
-            "cached": false,
-            "fallback": false,
-            "url": url,
-        })))
+    Ok((200, json!({
+        "ok": true,
+        "provider_id": id,
+        "models": models,
+        "cached": false,
+        "fallback": false,
+        "url": url,
+    })))
     }
 
 /// POST /api/providers/custom — add a relay-station / private-gateway

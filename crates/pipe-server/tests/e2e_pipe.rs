@@ -762,3 +762,99 @@ async fn list_roles_returns_empty_defaults() {
     }
     handle.abort();
 }
+
+// v0.4.17 (event 000053): chairman reported that the "拉取失败"
+// error showed a static i18n string instead of the real backend
+// error. Root cause: pipe-server's list_models handler never
+// emitted the top-level `ok` field, so TS's
+// `if (!res.ok) { setError(res.error ?? '拉取失败') }` always
+// fell through to the static string. This test pins the new
+// contract: when no API key is configured, the response MUST
+// carry `ok:false` and a structured `error` field with the
+// provider id + url for debugging.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn list_models_returns_ok_false_with_error_on_no_key() {
+    let (addr, handle) = spawn_server("models-nokey").await;
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+    // minimax is has_live_models_endpoint=true but no API key
+    // configured for this fresh server, so list_models should
+    // return ok:false with "no API key configured".
+    let resp = client::connect_and_request(
+        &addr,
+        serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "GET",
+            "params": {
+                "path": "/api/providers/minimax/models",
+                "body": { "id": "minimax" }
+            }
+        }),
+    )
+    .await;
+    let resp_text = serde_json::to_string(&resp).unwrap_or_default();
+    // Status MUST be 200 (info-level failure carried in body).
+    assert_eq!(resp["result"]["status"].as_u64().unwrap_or(0), 200,
+        "status must be 200 even on ok:false; resp={resp_text}");
+    let body = &resp["result"]["body"];
+    assert_eq!(
+        body["ok"], serde_json::json!(false),
+        "ok:false must be set; resp={resp_text}"
+    );
+    assert!(
+        body.get("error").is_some() && body["error"].is_string(),
+        "structured error string must be present; resp={resp_text}"
+    );
+    let err = body["error"].as_str().unwrap_or("");
+    assert!(
+        err.contains("no API key") || err.contains("key"),
+        "error must mention the missing key; got '{err}'"
+    );
+    assert_eq!(
+        body["provider_id"], serde_json::json!("minimax"),
+        "provider_id must be echoed; resp={resp_text}"
+    );
+    assert!(
+        body.get("url").is_some() && body["url"].as_str().unwrap().contains("/v1/models"),
+        "url must point at the live /v1/models; resp={resp_text}"
+    );
+    handle.abort();
+}
+
+// v0.4.17: the Anthropic preset has has_live_models_endpoint=false,
+// so the fallback catalog path should return ok:true with the
+// hardcoded ModelEntry list. This pins the success path.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn list_models_returns_ok_true_with_fallback_catalog() {
+    let (addr, handle) = spawn_server("models-fallback").await;
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let resp = client::connect_and_request(
+        &addr,
+        serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "GET",
+            "params": {
+                "path": "/api/providers/anthropic/models",
+                "body": { "id": "anthropic" }
+            }
+        }),
+    )
+    .await;
+    let resp_text = serde_json::to_string(&resp).unwrap_or_default();
+    assert_eq!(resp["result"]["status"].as_u64().unwrap_or(0), 200);
+    let body = &resp["result"]["body"];
+    assert_eq!(body["ok"], serde_json::json!(true), "resp={resp_text}");
+    assert_eq!(body["fallback"], serde_json::json!(true), "resp={resp_text}");
+    let models = body["models"].as_array().expect("models array");
+    assert!(!models.is_empty(), "fallback catalog must list ≥1 model; resp={resp_text}");
+    // Each model carries the v0.4.16 metadata fields.
+    for m in models {
+        assert!(m.get("thinking_strength").is_some(),
+            "model missing thinking_strength; resp={resp_text}");
+        assert!(m.get("context_length").is_some(),
+            "model missing context_length; resp={resp_text}");
+    }
+    handle.abort();
+}

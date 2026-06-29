@@ -140,11 +140,23 @@ export interface ProviderModel {
   thinking_strength?: 'low' | 'medium' | 'high';
 }
 
+// v0.4.17: pipe-server now returns HTTP 200 with `{ok:false, error:...}`
+// for every failure path (no API key, network error, parse error,
+// non-2xx upstream). This is to keep the failure context inside the
+// JSON-RPC body instead of throwing through pipe_request's
+// non-2xx-to-Error converter (which would strip the structured
+// error context).
 export interface FetchedModelsResult {
   ok: boolean;
   models: ProviderModel[];
   count: number;
   error?: string;
+  /** Provider id echoed back by the backend. */
+  provider_id?: string;
+  /** The URL the backend actually hit (for debugging). */
+  url?: string;
+  /** True if the response came from the hardcoded fallback catalog. */
+  fallback?: boolean;
 }
 
 export async function fetchProviderModels(id: string): Promise<FetchedModelsResult> {

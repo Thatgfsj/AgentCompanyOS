@@ -164,6 +164,12 @@ const zhCN = {
   'settings.models.thinking.low': '低',
   'settings.models.thinking.medium': '中',
   'settings.models.thinking.high': '高',
+  'settings.models.manualAdd.title': '手动添加模型',
+  'settings.models.manualAdd.id': '模型 ID',
+  'settings.models.manualAdd.displayName': '显示名称',
+  'settings.models.manualAdd.thinking': '思考强度',
+  'settings.models.manualAdd.context': '上下文长度',
+  'settings.models.manualAdd.submit': '添加',
   'settings.models.metadata.thinking': '思考',
   'settings.models.metadata.context': '上下文',
 

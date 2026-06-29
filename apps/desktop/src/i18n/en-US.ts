@@ -166,6 +166,12 @@ const enUS: Translations = {
   'settings.models.thinking.low': 'Low',
   'settings.models.thinking.medium': 'Medium',
 'settings.models.thinking.high': 'High',
+  'settings.models.manualAdd.title': 'Add model manually',
+  'settings.models.manualAdd.id': 'Model ID',
+  'settings.models.manualAdd.displayName': 'Display name',
+  'settings.models.manualAdd.thinking': 'Thinking',
+  'settings.models.manualAdd.context': 'Context length',
+  'settings.models.manualAdd.submit': 'Add',
   'settings.models.metadata.thinking': 'think',
   'settings.models.metadata.context': 'ctx',
 

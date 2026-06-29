@@ -18,16 +18,21 @@ import { tErr } from '../lib/errs.js';
 
 // ── Quick Add AI ─────────────────────────────────────────────────
 
+// v0.4.17: dropped the `envVar` field. The keychain entry name
+// happens to match the old env-var name (e.g. MINIMAX_API_KEY), but
+// the user shouldn't see the env-var flavour in the UI — that
+// language was confusing them into thinking Flowntier still reads
+// process env vars (it doesn't, since v0.4.12).
 const QUICK_PROVIDERS = [
-  { id: 'openai', name: 'OpenAI', envVar: 'OPENAI_API_KEY', placeholder: 'sk-...', description: 'GPT-5, GPT-5 Mini', color: '#10a37f' },
-  { id: 'anthropic', name: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', placeholder: 'sk-ant-...', description: 'Claude Opus, Sonnet, Haiku', color: '#d97706' },
-  { id: 'google', name: 'Google Gemini', envVar: 'GOOGLE_API_KEY', placeholder: 'AIza...', description: 'Gemini 2.5 Pro, Flash', color: '#4285f4' },
-  { id: 'deepseek', name: 'DeepSeek', envVar: 'DEEPSEEK_API_KEY', placeholder: 'sk-...', description: 'DeepSeek Chat, Reasoner', color: '#6366f1' },
-  { id: 'minimax', name: 'MiniMax', envVar: 'MINIMAX_API_KEY', placeholder: 'eyJ...', description: 'MiniMax M3', color: '#f97316' },
-  { id: 'kimi', name: 'Kimi (月之暗面)', envVar: 'MOONSHOT_API_KEY', placeholder: 'sk-...', description: 'Kimi K2', color: '#8b5cf6' },
-  { id: 'zhipu', name: 'GLM (智谱)', envVar: 'ZHIPU_API_KEY', placeholder: '', description: 'GLM-4', color: '#059669' },
-  { id: 'mimo', name: 'MIMO (小米)', envVar: 'MIMO_API_KEY', placeholder: 'sk-...', description: '小米 MIMO', color: '#ff6900' },
-  { id: 'siliconflow', name: 'SiliconFlow', envVar: 'SILICONFLOW_API_KEY', placeholder: 'sk-...', description: 'SiliconFlow (硅基流动)', color: '#0ea5e9' },
+  { id: 'openai',      name: 'OpenAI',             secretName: 'OPENAI_API_KEY',      placeholder: 'sk-...',      description: 'GPT-5, GPT-5 Mini',          color: '#10a37f' },
+  { id: 'anthropic',   name: 'Anthropic',          secretName: 'ANTHROPIC_API_KEY',  placeholder: 'sk-ant-...',  description: 'Claude Opus, Sonnet, Haiku', color: '#d97706' },
+  { id: 'google',      name: 'Google Gemini',      secretName: 'GOOGLE_API_KEY',     placeholder: 'AIza...',     description: 'Gemini 2.5 Pro, Flash',      color: '#4285f4' },
+  { id: 'deepseek',    name: 'DeepSeek',           secretName: 'DEEPSEEK_API_KEY',   placeholder: 'sk-...',      description: 'DeepSeek Chat, Reasoner',    color: '#6366f1' },
+  { id: 'minimax',     name: 'MiniMax',            secretName: 'MINIMAX_API_KEY',    placeholder: 'eyJ...',      description: 'MiniMax M3',                 color: '#f97316' },
+  { id: 'kimi',        name: 'Kimi (月之暗面)',     secretName: 'MOONSHOT_API_KEY',   placeholder: 'sk-...',      description: 'Kimi K2',                    color: '#8b5cf6' },
+  { id: 'zhipu',       name: 'GLM (智谱)',         secretName: 'ZHIPU_API_KEY',      placeholder: '',             description: 'GLM-4',                      color: '#059669' },
+  { id: 'mimo',        name: 'MIMO (小米)',        secretName: 'MIMO_API_KEY',       placeholder: 'sk-...',      description: '小米 MIMO',                   color: '#ff6900' },
+  { id: 'siliconflow', name: 'SiliconFlow',        secretName: 'SILICONFLOW_API_KEY',placeholder: 'sk-...',      description: 'SiliconFlow (硅基流动)',     color: '#0ea5e9' },
 ];
 
 function QuickAddAI({ onSaved }: { onSaved: () => void }) {
@@ -46,8 +51,8 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      console.log('[QuickAddAI] saving:', provider.envVar);
-      const result = await saveSecret(provider.envVar, apiKey.trim());
+      console.log('[QuickAddAI] saving:', provider.secretName);
+      const result = await saveSecret(provider.secretName, apiKey.trim());
       console.log('[QuickAddAI] save result:', result);
       if (!result || !result.saved) {
         setError(t('settings.quickAdd.errorInvalidKey'));
@@ -116,7 +121,6 @@ function QuickAddAI({ onSaved }: { onSaved: () => void }) {
         <div className="space-y-2">
           <label className="block text-xs text-text-secondary">
             {provider.name} {t('settings.custom.apiKeyLabel')}
-            <span className="ml-1 text-[10px] text-text-secondary">→ {provider.envVar}</span>
           </label>
           <input
             type="password"
@@ -926,6 +930,46 @@ function ProviderModelManager({
   const [error, setError] = useState<string | null>(null);
   const [fetched, setFetched] = useState<ProviderModel[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  // v0.4.17: inline manual-model-add form. Lets the chairman
+  // register models they actually use without depending on the
+  // provider's /v1/models endpoint (which keeps changing).
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualId, setManualId] = useState('');
+  const [manualDisplay, setManualDisplay] = useState('');
+  const [manualThinking, setManualThinking] = useState<'low' | 'medium' | 'high'>('medium');
+  const [manualContext, setManualContext] = useState<number>(128000);
+  const [manualErr, setManualErr] = useState<string | null>(null);
+
+  const submitManual = () => {
+    setManualErr(null);
+    const idTrim = manualId.trim();
+    if (!idTrim) { setManualErr(t('settings.error.invalidId')); return; }
+    if (!/^[a-zA-Z0-9._:-]+$/.test(idTrim)) {
+      setManualErr(t('settings.error.invalidId'));
+      return;
+    }
+    const display = manualDisplay.trim() || idTrim;
+    if (customModels.some((m) => m.id === idTrim)) {
+      setManualErr(t('settings.models.modelExists', { id: idTrim }));
+      return;
+    }
+    if (!Number.isFinite(manualContext) || manualContext < 1 || manualContext > 2_000_000) {
+      setManualErr(t('settings.models.invalidContextLength'));
+      return;
+    }
+    onAdd([{
+      id: idTrim,
+      display_name: display,
+      thinking_strength: manualThinking,
+      context_length: manualContext,
+    }]);
+    // Reset form for next entry.
+    setManualId('');
+    setManualDisplay('');
+    setManualThinking('medium');
+    setManualContext(128000);
+    setManualOpen(false);
+  };
 
   const pull = async () => {
     setBusy(true);
@@ -936,19 +980,13 @@ function ProviderModelManager({
     try {
       const res = await fetchProviderModels(providerId);
       if (!res.ok) {
-        // v0.4.16: surface the real backend error verbatim. The
-        // previous behaviour swallowed it behind a generic
-        // "拉取失败" string and chairman couldn't tell whether
-        // it was a 401, a network error, or a non-OpenAI
-        // response shape. We still keep the i18n key as a
-        // fallback if for some reason backend returns no error.
+        // v0.4.17: backend now ALWAYS returns ok:true/false with
+        // an explicit error message. Show the real message; fall
+        // back to the i18n string only as a defensive last resort.
         const backendErr = res.error ?? t('settings.models.pullError');
-        setError(backendErr);
-        try {
-          // Console-log the structured info so the user can
-          // copy-paste it into a bug report.
-          console.warn('[Flowntier] pull models failed', res);
-        } catch {/* ignore */}
+        const detail = res.url ? ` (${res.url})` : '';
+        setError(`${backendErr}${detail}`);
+        console.warn('[Flowntier] pull models failed', res);
       } else {
         setFetched(res.models);
       }
@@ -984,15 +1022,94 @@ function ProviderModelManager({
         <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
           {t('settings.models.customModels', {count: customModels.length})}
         </h4>
-        <button
-          type="button"
-          onClick={() => void pull()}
-          disabled={busy}
-          className="rounded-md border border-chief/40 bg-chief/10 px-2 py-0.5 text-[11px] text-chief hover:bg-chief/20 disabled:opacity-50"
-        >
-          {busy ? t('settings.action.save') : '🔄 ' + t('settings.providers.discoverModels')}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setManualOpen((v) => !v)}
+            className="rounded-md border border-border bg-surface-1 px-2 py-0.5 text-[11px] text-text-secondary hover:border-chief hover:text-chief"
+          >
+            ➕ {t('settings.models.manualAdd.title')}
+          </button>
+          <button
+            type="button"
+            onClick={() => void pull()}
+            disabled={busy}
+            className="rounded-md border border-chief/40 bg-chief/10 px-2 py-0.5 text-[11px] text-chief hover:bg-chief/20 disabled:opacity-50"
+          >
+            {busy ? t('settings.action.save') : '🔄 ' + t('settings.providers.discoverModels')}
+          </button>
+        </div>
       </div>
+
+      {manualOpen && (
+        <div className="mb-2 rounded border border-border bg-surface-1 p-2 text-xs">
+          <div className="mb-1 font-medium">{t('settings.models.manualAdd.title')}</div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-0.5">
+              <span className="text-text-secondary">{t('settings.models.manualAdd.id')}</span>
+              <input
+                type="text"
+                value={manualId}
+                onChange={(e) => setManualId(e.target.value)}
+                placeholder="MiniMax-Text-01"
+                className="rounded border border-border bg-surface-0 px-1.5 py-0.5 font-mono text-[11px]"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5">
+              <span className="text-text-secondary">{t('settings.models.manualAdd.displayName')}</span>
+              <input
+                type="text"
+                value={manualDisplay}
+                onChange={(e) => setManualDisplay(e.target.value)}
+                placeholder={manualId || 'MiniMax M3'}
+                className="rounded border border-border bg-surface-0 px-1.5 py-0.5 text-[11px]"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5">
+              <span className="text-text-secondary">{t('settings.models.manualAdd.thinking')}</span>
+              <select
+                value={manualThinking}
+                onChange={(e) => setManualThinking(e.target.value as 'low' | 'medium' | 'high')}
+                className="rounded border border-border bg-surface-0 px-1.5 py-0.5 text-[11px]"
+              >
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-0.5">
+              <span className="text-text-secondary">{t('settings.models.manualAdd.context')}</span>
+              <input
+                type="number"
+                min={1}
+                max={2000000}
+                value={manualContext}
+                onChange={(e) => setManualContext(Number(e.target.value))}
+                className="rounded border border-border bg-surface-0 px-1.5 py-0.5 text-[11px]"
+              />
+            </label>
+          </div>
+          {manualErr && (
+            <p role="alert" className="mt-1 text-[11px] text-red-400">{manualErr}</p>
+          )}
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => { setManualOpen(false); setManualErr(null); }}
+              className="rounded px-2 py-0.5 text-[11px] text-text-secondary hover:text-primary"
+            >
+              {t('settings.action.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={submitManual}
+              className="rounded bg-chief px-2 py-0.5 text-[11px] text-white hover:bg-chief/90"
+            >
+              {t('settings.models.manualAdd.submit')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {customModels.length === 0 ? (
         <div className="text-[11px] text-text-secondary">

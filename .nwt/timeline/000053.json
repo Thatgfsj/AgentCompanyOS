@@ -1,0 +1,27 @@
+{
+  "id": "000053",
+  "timestamp": "2026-06-30T02:06:00Z",
+  "task": "v0.4.17 — manual model entry + real pull error + QuickAddAI polish",
+  "summary": "v0.4.17 — manual model entry + real pull error + QuickAddAI polish",
+  "reason": "Three chairman-reported issues against v0.4.16:\n\n(1) '拉取失败' showed literal text instead of real error. Root cause: pipe-server's list_models handler (handlers.rs:643) returned Ok((200, json!({provider_id, models, cached}))) for success and Ok((4xx, json!({error}))) for failure — never emitting a top-level `ok` field. TS FetchedModelsResult declared `ok: boolean` but it was always undefined. Frontend `if (!res.ok)` always fell through to `res.error ?? '拉取失败'`. pipe_request additionally converted any non-2xx to Err() and threw past the TS layer entirely.\n\nFix: pipe-server now returns HTTP 200 with explicit `{ok: true/false, error?, provider_id?, url?}` on every list_models path (no API key, network error, parse error, non-2xx upstream, success). Status stays 200 so pipe_request doesn't throw. Frontend dropped the `!res.ok` check and relies on the body.error field. The error UI now appends `url` for debugging.\n\n(2) '我说了, 运营商的这里也要用户自己填写, 而不是自己拉取'. The pull button is unreliable because provider /v1/models endpoints change without notice (Xiaomi returned network error). Chairman wants manual model entry.\n\nFix: added a '➕ 手动添加模型' button next to '🔄 拉取最新模型' in ProviderModelManager. Click reveals an inline form (no modal) with: Model ID (regex-validated), Display name (defaults to ID), Thinking strength select (low/medium/high), Context length number (default 128000). On submit, the entry is appended to the curated set via the existing customModels.addMany hook and persists to localStorage. No backend round-trip.\n\n(3) 'MiniMax API 密钥 → MINIMAX_API_KEY' still showed env-var name. Root cause: QUICK_PROVIDERS declared `envVar: 'MINIMAX_API_KEY'` and QuickAddAI rendered `→ {provider.envVar}` in the dialog title. Renamed field to `secretName` (correct semantics — it's the keychain entry name, not an env var) and removed the `→ ...` suffix from the dialog label. The console.log that printed provider.envVar was also cleaned up.\n\nRegression tests:\n- list_models_returns_ok_false_with_error_on_no_key — pins the new contract for ok:false + error + provider_id + url.\n- list_models_returns_ok_true_with_fallback_catalog — pins the Anthropic fallback path.\n\n13/13 e2e + 20/20 unit pass. tsc clean. NSIS installer (8,377,916 bytes) at C:\\Users\\thatg\\Desktop\\Flowntier_0.4.17_x64-setup.exe. Awaiting hand-test.\n\nNote: MiMo's base_url is probably wrong but the manual model form (Issue 2) makes it irrelevant — the user can now type model IDs directly without depending on the broken /v1/models endpoint.",
+  "files": [
+    "crates/pipe-server/src/handlers.rs",
+    "apps/desktop/src/lib/api.ts",
+    "apps/desktop/src/zones/Settings.tsx",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts",
+    "crates/pipe-server/tests/e2e_pipe.rs",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/package.json"
+  ],
+  "tags": [
+    "v0.4.17",
+    "real-pull-error",
+    "manual-model-entry",
+    "ok-false-in-body",
+    "QuickAddAI-no-env-var",
+    "Xiaomi-deferred",
+    "chairman-handoff",
+    "no-tag-yet"
+  ]
+}
