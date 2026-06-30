@@ -7,7 +7,10 @@
 
 use std::path::PathBuf;
 
-use pipe_server::{register_all, run_quota_scheduler, Dispatcher, Server, ServerConfig, ServerState};
+use pipe_server::{
+    register_all, run_http_bridge, run_quota_scheduler, Dispatcher, Server, ServerConfig,
+    ServerState,
+};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() -> std::io::Result<()> {
@@ -59,6 +62,24 @@ async fn main() -> std::io::Result<()> {
     // SQLite and the next process restart will pick them up.
     let _scheduler = tokio::spawn(run_quota_scheduler(state.clone()));
 
+    // v0.4.21 (event 000057): HTTP + SSE bridge for the portable
+    // HTML frontend. Loopback only (127.0.0.1:8765 by default;
+    // FLOWNTIER_HTTP_BRIDGE env var to override). Provides
+    //   POST /rpc     — JSON-RPC 2.0
+    //   GET  /events  — Server-Sent Events
+    //   GET  /health  — health probe
+    // Dies with the runtime process.
+    let bind = pipe_server::ws_bridge::bind_from_env();
+    let dispatcher_for_bridge = state.dispatcher().expect("dispatcher wired by register_all");
+    let bridge = tokio::spawn(run_http_bridge(
+        bind,
+        dispatcher_for_bridge,
+        state.events.clone(),
+    ));
+
     let server = Server::new(cfg, d, state.events.clone());
-    server.run().await
+    tokio::select! {
+        r = server.run() => r,
+        _ = bridge => Ok(()),
+    }
 }

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Flowntier · HTML Frontend</title>
+<style>
+  :root {
+    --bg: #0f1115; --surface: #181b22; --surface-2: #1f232c;
+    --border: #2a2f3a; --text: #e6e8ee; --text-2: #9aa3b2; --text-3: #6b7280;
+    --chief: #7c5cff; --warn: #f59e0b; --ok: #10b981; --fail: #ef4444; --pending: #f97316;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    height: 100%; }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    background: var(--surface); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 14px; margin: 0; font-weight: 600; }
+  header .pill { padding: 2px 8px; border-radius: 999px; font-size: 10px;
+    background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+  header .pill.ok { background: rgba(16,185,129,0.12); color: var(--ok); border-color: rgba(16,185,129,0.3); }
+  header .pill.fail { background: rgba(239,68,68,0.12); color: var(--fail); border-color: rgba(239,68,68,0.3); }
+  header .spacer { flex: 1; }
+  header select { background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    padding: 4px 8px; border-radius: 6px; font-size: 11px; }
+  main { flex: 1; display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
+  .pane { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .pane + .pane { border-left: 1px solid var(--border); }
+  .pane > .pane-title { padding: 8px 12px; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2);
+    background: var(--surface); border-bottom: 1px solid var(--border); }
+  .pane-body { flex: 1; min-height: 0; overflow: auto; padding: 12px; }
+  .transcript { font-size: 13px; line-height: 1.55; }
+  .transcript .user { color: var(--chief); }
+  .transcript .assistant { color: var(--text); }
+  .transcript .system { color: var(--text-3); font-style: italic; }
+  .input-row { display: flex; gap: 8px; padding: 10px; background: var(--surface); border-top: 1px solid var(--border); }
+  .input-row textarea { flex: 1; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px; font-family: inherit; font-size: 13px; resize: none; min-height: 70px; }
+  .input-row button { background: var(--chief); color: white; border: none; padding: 8px 16px;
+    border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; }
+  .input-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .quota-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px;
+    background: var(--surface-2); font-size: 12px; }
+  .quota-row .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; }
+  .quota-row .role { font-family: ui-monospace, monospace; color: var(--text-2); }
+  .quota-row .model { font-family: ui-monospace, monospace; color: var(--text); }
+  .quota-row .label { color: var(--text-2); }
+  .quota-row .x { margin-left: auto; color: var(--fail); cursor: pointer; padding: 2px 6px;
+    border-radius: 4px; border: 1px solid rgba(239,68,68,0.3); }
+  .quota-row .x:hover { background: rgba(239,68,68,0.1); }
+  .quota-empty { color: var(--text-3); font-size: 12px; padding: 16px; text-align: center; }
+  .nudge-banner { margin: 0 12px 8px; padding: 10px 12px; border-radius: 6px;
+    background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
+    color: var(--warn); font-size: 12px; }
+  .nudge-banner .title { font-weight: 600; margin-bottom: 4px; }
+  .nudge-banner .body { color: var(--text-2); }
+  .resolve-status { padding: 6px 12px; font-size: 11px; color: var(--text-2);
+    background: var(--surface); border-bottom: 1px solid var(--border); }
+  .resolve-status.error { color: var(--fail); }
+  .role-picker { display: flex; gap: 8px; align-items: center; padding: 8px 12px;
+    background: var(--surface); border-bottom: 1px solid var(--border); font-size: 11px; }
+  .role-picker label { color: var(--text-2); }
+  .role-picker select { background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    padding: 4px 8px; border-radius: 6px; font-size: 11px; }
+  details { margin-top: 8px; }
+  details summary { cursor: pointer; color: var(--text-2); font-size: 11px; }
+  details pre { background: var(--surface-2); padding: 8px; border-radius: 6px;
+    font-size: 11px; overflow: auto; max-height: 200px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Flowntier</h1>
+  <span class="pill" id="versionPill">v0.4.20+</span>
+  <span class="pill" id="statusPill">—</span>
+  <span class="spacer"></span>
+  <span data-i18n="ui.language">语言</span>:
+  <select id="langPicker">
+    <option value="zh-CN">中文</option>
+    <option value="en-US">English</option>
+  </select>
+</header>
+
+<main>
+  <!-- Chat pane (left) -->
+  <div class="pane" id="chatPane">
+    <div class="pane-title" data-i18n="chat.title">对话</div>
+    <div class="role-picker">
+      <label data-i18n="chat.role">角色</label>
+      <select id="rolePicker">
+        <option value="agent:chief">主理 (chief)</option>
+        <option value="agent:worker">工匠 (worker)</option>
+        <option value="agent:planner">规划 (planner)</option>
+        <option value="agent:critic:a">缺陷猎手 (critic:a)</option>
+        <option value="agent:critic:b">质检师 (critic:b)</option>
+        <option value="agent:reporter">汇报 (reporter)</option>
+      </select>
+      <span class="spacer" style="flex:1"></span>
+      <span id="resolveLabel" data-i18n="chat.resolveLoading">解析中…</span>
+    </div>
+    <div class="resolve-status" id="resolveStatus"></div>
+    <div id="nudgeBanner" style="display:none" class="nudge-banner">
+      <div class="title" data-i18n="chatZone.quotaNudgeTitle">Quota Refresh</div>
+      <div class="body"></div>
+    </div>
+    <div class="pane-body" id="transcript">
+      <div class="transcript">
+        <div class="system" data-i18n="chat.welcome">— 开始对话 —</div>
+      </div>
+    </div>
+    <div class="input-row">
+      <textarea id="userInput" data-i18n-placeholder="chat.inputPlaceholder"
+        placeholder="跟角色说点什么…（Ctrl+Enter 发送）"></textarea>
+      <button id="sendBtn" data-i18n="chat.send">发送</button>
+    </div>
+  </div>
+
+  <!-- Settings / Quota pane (right) -->
+  <div class="pane" id="settingsPane">
+    <div class="pane-title" data-i18n="settings.quota.heading">角色额度状态</div>
+    <div class="pane-body" id="quotaList">
+      <div class="quota-empty" data-i18n="settings.quota.empty">正常 — 没有挂起的失败。</div>
+    </div>
+    <details>
+      <summary data-i18n="settings.logs.heading">日志</summary>
+      <pre id="logPane"></pre>
+    </details>
+  </div>
+</main>
+
+<script src="./app.js"></script>
+</body>
+</html>

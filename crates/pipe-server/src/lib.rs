@@ -21,9 +21,13 @@ pub mod providers;
 pub mod scheduler;
 pub mod secrets;
 pub mod server;
+pub mod ws_bridge;
 
 pub use dispatcher::Dispatcher;
 pub use handlers::{register_all, ServerState};
 pub use protocol::{codes, RpcError, RpcParams, RpcRequest, RpcResponse, RpcResult, MAX_LINE};
 pub use scheduler::run_quota_scheduler;
 pub use server::{Server, ServerConfig};
+pub use ws_bridge::{
+    bind_listener, run_http_bridge, run_http_bridge_on, DEFAULT_BIND as DEFAULT_HTTP_BIND,
+};

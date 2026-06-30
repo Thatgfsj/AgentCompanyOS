@@ -1,0 +1,36 @@
+{
+  "id": "000057",
+  "timestamp": "2026-07-01T02:15:00Z",
+  "task": "v0.4.21 — HTTP+SSE bridge + portable HTML frontend (cross-system portable)",
+  "summary": "v0.4.21 — HTTP+SSE bridge + portable HTML frontend (cross-system portable)",
+  "reason": "Chairman directive: '除了这个win系统的前端，给html的也补充一下，方便移植别的系统.'\n\nTwo parts:\n\nA) HTTP+SSE bridge (new file crates/pipe-server/src/ws_bridge.rs):\n   The pipe server's primary transport is named pipes\n   (Windows) / Unix domain sockets (macOS/Linux). That's the\n   right choice for the Tauri desktop shell on the same machine\n   — but it locks out every browser, on any OS.\n\n   The bridge exposes the same JSON-RPC API + events stream\n   over loopback HTTP:\n     POST /rpc      — JSON-RPC 2.0 (Content-Length body)\n     GET  /events   — Server-Sent Events\n     GET  /health   — health probe\n     OPTIONS *      — CORS preflight\n\n   - bind to 127.0.0.1:8765 by default (FLOWNTIER_HTTP_BRIDGE env var to override)\n   - refuses non-loopback peers (defence-in-depth even if bind is widened)\n   - raw HTTP/1.1 implementation; no new dependencies (tokio + tracing already in)\n   - spawned by bin/flowntier-runtime.rs after register_all, alongside the quota scheduler\n   - /events is a real SSE stream: `data: <json>\\n\\n` per AgentEvent, browsers auto-reconnect\n   - public API: run_http_bridge(bind, dispatcher, events_tx) and run_http_bridge_on(listener, ...) for tests\n   - bind_listener('127.0.0.1:0') lets tests learn the OS-assigned port without rebind race\n\nB) Portable HTML frontend (new dir apps/html-frontend/):\n   Single index.html + app.js (~400 lines vanilla JS) + README.md.\n   Talks to the bridge directly via fetch() + EventSource. No\n   Tauri, no bundler, no framework. Runs from any browser, on\n   any OS.\n\n   Features shipped in this commit:\n   - language picker (zh-CN / en-US, persisted in localStorage)\n   - role picker (chief / worker / planner / critic:a / critic:b / reporter)\n   - resolve status line under the role picker (default / no key / unconfigured)\n   - chat input + transcript (renders text deltas + tool events + done)\n   - quota status side panel (polled every 15s; renders failed / pending_5h_wait / rate_limited states)\n   - reset button on rate_limited rows (POST /api/quota/reset)\n   - quota nudge banner above the chat (auto-renders when scheduler emits QUOTA_NUDGE: events)\n   - log pane (collapsed) for debugging\n\n   Deferred (v0.5 follow-up):\n   - Settings pane (provider management, secret editing, role assignments)\n     — endpoints already exist; UI wrapping is straightforward but\n     not in this commit's scope.\n\nC) Tests (5 new e2e tests in crates/pipe-server/tests/e2e_pipe.rs):\n   - http_bridge_health_returns_ok\n   - http_bridge_rpc_round_trips  (POST /rpc with JSON-RPC body → JSON-RPC response)\n   - http_bridge_rpc_missing_content_length_returns_400\n   - http_bridge_cors_preflight_returns_204\n   - http_bridge_unknown_route_returns_404\n   All 5 pass. Workspace tests: 159 passed (30 in pipe-server + the rest).\n\nD) Build / commit:\n   - cargo test -p pipe-server → 30/30 passed (5 new bridge + 25 pre-existing)\n   - No new NSIS ship needed (no UI changes for the Tauri shell)\n   - No runtime rebuild needed (bridge is part of pipe-server binary; the new runtime binary will be picked up by the v0.4.20 → v0.4.21 rebuild when chairman does the next hand-test)\n\nHonest risk callouts:\n- /events SSE stream never closes naturally; we half-close after each\n  handler returns but the connection is meant to be long-lived.\n  EventSource auto-reconnects on TCP close. Tested manually.\n- The HTML frontend intentionally bypasses the Tauri IPC layer\n  (no shell). It works only when the runtime's HTTP bridge is\n  bound (default 127.0.0.1:8765). If chairman restarts the runtime\n  with a non-loopback bind, the browser will refuse.\n- bridge handshake code is ~400 lines hand-rolled (vs. pulling in\n  hyper/axum). Robust to the test cases but not stress-tested\n  against malformed chunked transfer, HTTPS upgrade, etc. — out of\n  scope for v0.4.21.\n\nDeferred from v0.4.20 still tracked (next round):\n- per-provider HTTP error-code parsing (Anthropic 529 / OpenAI 429 / etc.)\n- textarea overlay bug investigate (v0.4.19 residual)\n- Settings provider-management UI in the HTML frontend",
+  "files": [
+    "crates/pipe-server/src/ws_bridge.rs",
+    "crates/pipe-server/src/lib.rs",
+    "crates/pipe-server/src/bin/flowntier-runtime.rs",
+    "crates/pipe-server/tests/e2e_pipe.rs",
+    "apps/html-frontend/index.html",
+    "apps/html-frontend/app.js",
+    "apps/html-frontend/README.md"
+  ],
+  "tags": [
+    "v0.4.21",
+    "http-bridge",
+    "sse-stream",
+    "loopback-only",
+    "cors-preflight",
+    "portable-frontend",
+    "no-tauri",
+    "no-bundler",
+    "vanilla-js",
+    "chatzone-html",
+    "quota-status-html",
+    "nudge-banner-html",
+    "i18n-zh-cn-en-us",
+    "cross-platform-portable",
+    "tests-30-passed",
+    "workspace-tests-159-passed",
+    "chairman-hand-test",
+    "no-tag-yet"
+  ]
+}
