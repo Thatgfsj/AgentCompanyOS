@@ -431,6 +431,16 @@ const zhCN = {
   'drift.message':
     '⚠ Sidecar 运行时版本 (v{{sidecar}}) 低于 shell 期望 (v{{expected}}). 某些功能可能不可用。请重新构建 sidecar。',
   'drift.dismiss': '关闭',
+
+// ── v0.4.20 quota tracker (event 000056) ─────────────
+  'settings.roles.quota.heading': '角色额度状态',
+  'settings.roles.quota.empty': '正常 — 没有挂起的失败。',
+  'settings.roles.quota.failed': '本次失败 · 重试等 5h 刷新点',
+  'settings.roles.quota.pending_5h_wait': '主理已挂 · 等下一个 5h 刷新点',
+  'settings.roles.quota.rate_limited': '已停 · 重置',
+  'settings.roles.quota.reset': '重置',
+  'chatZone.quotaNudgeTitle': 'Quota Refresh',
+  'chatZone.quotaNudge': 'AI 之前疑似到达上限，目前已经刷新，检查工作进度并且继续工作',
 };
 
 export type Translations = typeof zhCN;

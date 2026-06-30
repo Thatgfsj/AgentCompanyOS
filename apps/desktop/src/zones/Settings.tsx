@@ -8,8 +8,10 @@ import {
   listRouterRoles, listRouterModels, updateRouterRoles,
   fetchProviderModels,
   addCustomProvider, removeCustomProvider,
+  getQuotaStatus, resetQuota,
   type ProviderInfo, type RoleInfo,
   type ProviderModel,
+  type QuotaStatusEntry,
 } from '../lib/api.js';
 import { useCustomModels } from '../hooks/useCustomModels.js';
 import { appVersion, buildSha } from '../lib/version.js';
@@ -190,6 +192,11 @@ export function Settings({ open, onClose, workdir }: SettingsProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  // v0.4.20 (event 000056): quota_failures tracker. Polled on
+  // open + after every role-config save so the StatusLine stays
+  // current. The scheduler can flip rows between ticks, so we
+  // also poll every 30s while Settings is open.
+  const [quotaRows, setQuotaRows] = useState<QuotaStatusEntry[]>([]);
   // BUG-FRONTEND-RT-6 (event 000038): double-confirmation flow
   // for destructive "Clear local data" — the user must type a
   // specific phrase before the destructive button activates.
@@ -279,6 +286,25 @@ export function Settings({ open, onClose, workdir }: SettingsProps) {
       console.error('[Settings] refresh failed:', e);
     }
   };
+
+  // v0.4.20 (event 000056): quota status refresh + 30s poll
+  // while Settings is open. The scheduler can flip a row to
+  // rate_limited without the user saving anything, so we need
+  // to re-fetch to keep the StatusLine honest.
+  const refreshQuota = async () => {
+    try {
+      const r = await getQuotaStatus();
+      if (r.ok && r.rows) setQuotaRows(r.rows);
+    } catch (e) {
+      console.error('[Settings] refreshQuota failed:', e);
+    }
+  };
+  useEffect(() => {
+    if (!open) return;
+    void refreshQuota();
+    const id = setInterval(() => void refreshQuota(), 30_000);
+    return () => clearInterval(id);
+  }, [open]);
 
   // Re-merge when custom models change (after add/remove in the modal)
   // so the model picker updates without a full server refresh.
@@ -585,6 +611,7 @@ export function Settings({ open, onClose, workdir }: SettingsProps) {
                   </button>
                 </Card>
                 <SearchBugPanel />
+                <QuotaStatusBlock rows={quotaRows} onReset={refreshQuota} />
 
                 {/* v0.4.12 (event 000048): RoleAssignmentCard moved
                     here (was above the About card). Keeps the
@@ -1526,5 +1553,99 @@ function CustomProviderForm({ onSaved }: { onSaved: () => void }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ── v0.4.20 (event 000056): quota status block ─────────────────────
+// Top-level "角色额度状态" card. Lists every quota_failures row
+// from the Rust pipe (polled every 30s while Settings is open)
+// and gives the chairman a 重置 button per row.
+//
+// Behaviour:
+//   - empty list → renders a friendly "正常" placeholder so the
+//     chairman knows the panel exists but no rows are present
+//   - status="failed" → amber dot · 本次失败
+//   - status="pending_5h_wait" → orange dot · 等下一个 5h 刷新点
+//   - status="rate_limited" → red X · 已停 (click 重置 to lift)
+
+interface QuotaStatusBlockProps {
+  rows: QuotaStatusEntry[];
+  onReset: () => void | Promise<void>;
+}
+
+function QuotaStatusBlock({ rows, onReset }: QuotaStatusBlockProps) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const handleReset = async (row: QuotaStatusEntry) => {
+    const key = `${row.role_id}:${row.model_id}`;
+    setBusy(key);
+    try {
+      const r = await resetQuota(row.role_id, row.model_id);
+      if (r.ok) await onReset();
+    } catch (e) {
+      console.error('[QuotaStatusBlock] reset failed:', e);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        {t('settings.roles.quota.heading')}
+      </h3>
+      {rows.length === 0 ? (
+        <p className="px-1 text-[10px] text-text-secondary">
+          {t('settings.roles.quota.empty')}
+        </p>
+      ) : (
+        <ol className="flex flex-col gap-1">
+          {rows.map((row) => {
+            const status = row.status;
+            const labelKey =
+              status === 'failed' ? 'failed'
+                : status === 'pending_5h_wait' ? 'pending_5h_wait'
+                : status === 'rate_limited' ? 'rate_limited'
+                : 'failed';
+            const dotColor =
+              status === 'failed' ? 'bg-status-warn'
+                : status === 'pending_5h_wait' ? 'bg-status-pending'
+                : status === 'rate_limited' ? 'bg-status-failed'
+                : 'bg-text-secondary';
+            const key = `${row.role_id}:${row.model_id}`;
+            return (
+              <li
+                key={key}
+                className="flex items-center justify-between rounded-md border border-border bg-surface-2 px-2 py-1.5 text-[11px]"
+              >
+                <span className="flex items-center gap-2">
+                  <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
+                  <span className="font-mono text-text-secondary">{row.role_id}</span>
+                  <span className="text-text-tertiary">·</span>
+                  <span className="font-mono">{row.model_id}</span>
+                  <span className="text-text-tertiary">·</span>
+                  <span>{t(`settings.roles.quota.${labelKey}`)}</span>
+                  {row.attempt_count > 1 && (
+                    <span className="text-text-tertiary">
+                      ×{row.attempt_count}
+                    </span>
+                  )}
+                </span>
+                {status === 'rate_limited' && (
+                  <button
+                    onClick={() => void handleReset(row)}
+                    disabled={busy === key}
+                    className="rounded-md border border-status-failed/40 bg-status-failed/10 px-2 py-0.5 text-[10px] text-status-failed hover:bg-status-failed/20 disabled:opacity-40"
+                  >
+                    {busy === key ? '…' : t('settings.roles.quota.reset')}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </Card>
   );
 }

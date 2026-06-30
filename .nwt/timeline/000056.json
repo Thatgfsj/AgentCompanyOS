@@ -1,0 +1,41 @@
+{
+  "id": "000056",
+  "timestamp": "2026-07-01T01:30:00Z",
+  "task": "v0.4.20 — quota-failure tracker + 5h auto-retry scheduler (Phase-2 shipped)",
+  "summary": "v0.4.20 — quota-failure tracker + 5h auto-retry scheduler (Phase-2 shipped)",
+  "reason": "Chairman directive: '普通模型额度挂了 → 甩给主理 → 主理也额度挂了 → 等最近5小时刷新点试一次 → 试好了静默继续，试不好发一条通知给主理，然后记日志停掉，不再折腾。'\n\nTwo commits to deliver this end-to-end:\n\nCommit 4689a34 (Rust backend):\n- migration 0005_quota_failures.sql: new table with (role_id, model_id) PK + status state machine (failed → pending_5h_wait → rate_limited) + partial index for cheap 5h-tick scans.\n- QuotaFailureRow struct + 7 Repository methods (record / set_pending_5h_wait / mark_rate_limited / clear / list_pending_5h_wait / list_all / status_for).\n- ServerState.dispatcher: Arc<Mutex<Option<Arc<Dispatcher>>>> + set_dispatcher + dispatcher() methods. Populated by register_all after handlers register. Required for the scheduler to dispatch internal POST /api/run_task retries without going through the IPC dispatcher.\n- 3 new RPC endpoints: GET /api/quota/status, POST /api/quota/reset, plus existing GET /api/router/roles/{role}/resolve now embeds quota_status inline.\n- run_task handler: on any non-DONE status, calls record_quota_failure; if role == agent:chief, also calls set_quota_pending_5h_wait (the chairman's escalation boundary). On success, clear_quota_failure (auto-cleanup).\n- scheduler.rs (NEW): Phase-2 implementation. tokio::interval 60s, ticks at 5h boundaries (00:01 / 05:01 / 10:01 / 15:01 / 20:01 local). For each pending row, pulls state.dispatcher() and dispatches POST /api/run_task with a probe task. Success → clear_quota_failure (silent). Failure → mark_quota_rate_limited + emit AgentEvent::Done { wf_id: 'quota_nudge:role:model', status: 'QUOTA_NUDGE:role:model', summary: 'AI 之前疑似到达上限...' } + tracing::error log.\n- bin/flowntier-runtime.rs spawns scheduler after register_all (so dispatcher is wired). lib.rs pub use scheduler::run_quota_scheduler.\n- 6 new e2e tests pin the wire contract. Workspace tests: 154 passed (25 in pipe-server + the rest across agent-core / storage / etc).\n\nFrontend commit (current):\n- TS api.ts: RoleResolveStatus gets quota_status field; new QuotaStatusEntry + QuotaStatusResponse interfaces; new getQuotaStatus / resetQuota / getRoleQuotaStatus wrappers.\n- Tauri lib.rs: 3 new #[tauri::command] functions (get_quota_status, reset_quota, get_role_quota_status) registered in invoke_handler.\n- Settings.tsx: QuotaStatusBlock component renders a top-level Card with per-row status dots (amber for failed, orange for pending_5h_wait, red for rate_limited) + 重置 button for rate_limited rows. Polls getQuotaStatus every 30s while Settings is open.\n- ChatZone.tsx: detects AgentEvent::Done { status: 'QUOTA_NUDGE:...' } and renders a yellow banner above the chat input with the chairman-mandated text.\n- i18n zh-CN + en-US: settings.roles.quota.{heading,empty,failed,pending_5h_wait,rate_limited,reset} + chatZone.quotaNudge{title,nudge}.\n- Version 0.4.19 → 0.4.20 in tauri.conf.json + package.json.\n\nBuild sequence (per v0.4.14 lesson):\n1. pnpm build (vite) → dist/ 612KB gzip 190KB\n2. cargo build --release -p pipe-server --bin flowntier-runtime → 8.4MB stripped\n3. cp target/release/flowntier-runtime.exe → apps/desktop/src-tauri/binaries/flowntier_runtime-x86_64-pc-windows-msvc.exe\n4. pnpm tauri build --bundles nsis → tauri-desktop.exe + initial NSIS bundle\n5. pnpm tauri:patch → adds 2nd CheckIfAppIsRunning macro for flowntier_runtime.exe (BUG-FRONTEND-RT-15)\n6. 'C:/Users/thatg/AppData/Local/tauri/NSIS/makensis.exe' target/release/nsis/x64/installer.nsi → rebuilt with sidecar kill\n7. cp target/release/bundle/nsis/Flowntier_0.4.20_x64-setup.exe → ~/Desktop/\n8. cargo test -p pipe-server → 25/25 passed\n\nNSIS installer: 8,441,823 bytes at C:\\Users\\thatg\\Desktop\\Flowntier_0.4.20_x64-setup.exe\n\nHonest risk callouts:\n- Phase-2 (auto-retry via dispatcher) shipped in this commit. Per-provider HTTP error-code parsing (Anthropic 529 / OpenAI 429) deferred to v0.4.21.\n- The scheduler's probe task is real LLM traffic — a chief (chief, model) pair triggers a full chat completion at each 5h tick. Cheap in tokens but not free. Acceptable per the chairman's '试好了静默继续' spec.\n- Test coverage of Phase-2 scheduler logic itself is via wire contract (we can't drive a real 5h boundary in a unit test); manual smoke-test required.",
+  "files": [
+    "crates/storage/migrations/0005_quota_failures.sql",
+    "crates/storage/src/lib.rs",
+    "crates/pipe-server/src/scheduler.rs",
+    "crates/pipe-server/src/handlers.rs",
+    "crates/pipe-server/src/bin/flowntier-runtime.rs",
+    "crates/pipe-server/src/lib.rs",
+    "crates/pipe-server/tests/e2e_pipe.rs",
+    "apps/desktop/src/lib/api.ts",
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/src/zones/Settings.tsx",
+    "apps/desktop/src/zones/ChatZone.tsx",
+    "apps/desktop/src/i18n/zh-CN.ts",
+    "apps/desktop/src/i18n/en-US.ts",
+    "apps/desktop/package.json"
+  ],
+  "tags": [
+    "v0.4.20",
+    "quota-tracker",
+    "5h-scheduler",
+    "phase-2-dispatcher-hook",
+    "auto-recovery",
+    "auto-nudge-event",
+    "settings-quota-block",
+    "chatzone-nudge-banner",
+    "i18n-quota-keys",
+    "version-bump-0.4.20",
+    "nsis-shipped-8.4mb",
+    "tests-25-passed",
+    "workspace-tests-154-passed",
+    "chairman-hand-test",
+    "no-tag-yet"
+  ]
+}

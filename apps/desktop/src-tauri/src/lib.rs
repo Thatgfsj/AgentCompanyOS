@@ -464,6 +464,39 @@ async fn get_role_resolve_status(role: String) -> Result<serde_json::Value, Stri
     .await
 }
 
+// ── v0.4.20 quota tracker ─────────────────────────────────────────
+// Surface the per-(role, model) quota state to the frontend.
+// Settings → 角色额度状态 block consumes `get_quota_status`;
+// the chairman's "重置" button calls `reset_quota`;
+// `get_role_quota_status` is a convenience wrapper used by
+// the inline StatusLine.
+
+#[tauri::command]
+async fn get_quota_status() -> Result<serde_json::Value, String> {
+    pipe_request("GET", "/api/quota/status", None).await
+}
+
+#[tauri::command]
+async fn reset_quota(role: String, model_id: Option<String>) -> Result<serde_json::Value, String> {
+    let body = serde_json::json!({
+        "role": role,
+        "model_id": model_id,
+    });
+    pipe_request("POST", "/api/quota/reset", Some(body)).await
+}
+
+#[tauri::command]
+async fn get_role_quota_status(role: String) -> Result<serde_json::Value, String> {
+    // Forward to the resolve endpoint, which embeds quota_status
+    // inline; the frontend unwraps `.quota_status` if present.
+    pipe_request(
+        "GET",
+        &format!("/api/router/roles/{role}/resolve"),
+        Some(serde_json::json!({ "role": role })),
+    )
+    .await
+}
+
 #[tauri::command]
 async fn toggle_provider(id: String, enabled: bool) -> Result<(), String> {
     // PATCH /api/providers/{id} body {"enabled": bool}
@@ -1469,6 +1502,7 @@ pub fn run() {
             list_secrets, save_secret, delete_secret, reveal_secret, seed_secrets,
             list_providers, toggle_provider,
             list_router_roles, list_router_models, update_router_roles, get_role_resolve_status,
+            get_quota_status, reset_quota, get_role_quota_status,
             list_plugins, invoke_plugin, fetch_provider_models,
             add_custom_provider, remove_custom_provider,
             start_workflow_cmd, get_workflow, cancel_workflow,

@@ -112,6 +112,10 @@ export async function listRouterModels(): Promise<{ models: { provider: string; 
 // preview so the ChatZone status line can show "未配置: 在设置里先选
 // default_model" inline. Always returns ok:true/false + payload,
 // never throws.
+// v0.4.19: resolve a role's default_model + keyring into a single
+// preview so the ChatZone status line can show "未配置: 在设置里先选
+// default_model" inline. Always returns ok:true/false + payload,
+// never throws.
 export interface RoleResolveStatus {
   ok: boolean;
   role?: string;
@@ -122,9 +126,63 @@ export interface RoleResolveStatus {
   has_key?: boolean;
   fallback_chain?: string[];
   error?: string;
+  // v0.4.20: per-(role, model) quota state. undefined when no
+  // failure has been recorded (the common case). When present,
+  // status ∈ "failed" | "pending_5h_wait" | "rate_limited".
+  quota_status?: QuotaStatusEntry;
 }
 export async function getRoleResolveStatus(role: string): Promise<RoleResolveStatus> {
   return invoke<RoleResolveStatus>('get_role_resolve_status', { role });
+}
+
+// ── v0.4.20 quota tracker ─────────────────────────────────────────
+// Each row in `quota_failures` represents a (role, model) pair that
+// failed recently. The Settings → 角色额度状态 block lists every
+// row; the ChatZone status line shows the row inline next to the
+// model select.
+
+export interface QuotaStatusEntry {
+  /** "agent:chief" | "agent:worker" | "agent:planner" | ... */
+  role_id: string;
+  /** "minimax:MiniMax-Text-01" — provider:model identifier. */
+  model_id: string;
+  /** "failed" | "pending_5h_wait" | "rate_limited". */
+  status: string;
+  attempt_count: number;
+  last_error_at: number;
+  last_error_message: string;
+  next_attempt_at: number | null;
+}
+
+export interface QuotaStatusResponse {
+  ok: boolean;
+  rows?: QuotaStatusEntry[];
+  error?: string;
+}
+
+/** GET /api/quota/status. Returns all quota_failures rows. */
+export async function getQuotaStatus(): Promise<QuotaStatusResponse> {
+  return invoke<QuotaStatusResponse>('get_quota_status');
+}
+
+/** POST /api/quota/reset. Clears one (role, model) row. */
+export async function resetQuota(
+  role: string,
+  model_id?: string,
+): Promise<{ ok: boolean; cleared_rows?: number; error?: string }> {
+  return invoke('reset_quota', { role, model_id });
+}
+
+/**
+ * v0.4.20: convenience wrapper — fetch quota_status for one role via
+ * the resolve endpoint (saves a round-trip when the caller already
+ * needs the resolve result).
+ */
+export async function getRoleQuotaStatus(
+  role: string,
+): Promise<QuotaStatusEntry | null> {
+  const r = await getRoleResolveStatus(role);
+  return r.quota_status ?? null;
 }
 
 export async function updateRouterRoles(roles: RoleInfo[]): Promise<void> {

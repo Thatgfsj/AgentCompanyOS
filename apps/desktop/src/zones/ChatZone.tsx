@@ -64,6 +64,22 @@ export function ChatZone(_: ChatZoneProps = {}) {
     [events],
   );
 
+  // v0.4.20 (event 000056): the scheduler emits a special
+  // AgentEvent::Done { status: "QUOTA_NUDGE:<role>:<model>" } when
+  // a chief (role, model) pair is marked rate_limited. Surface the
+  // nudge inline as a yellow banner above the chat input.
+  const quotaNudge = useMemo(() => {
+    const nudge = events.find(
+      (e) => e.kind === 'done' && typeof e.status === 'string'
+        && e.status.startsWith('QUOTA_NUDGE:'),
+    );
+    if (!nudge || nudge.kind !== 'done') return null;
+    return {
+      summary: nudge.summary ?? '',
+      status: nudge.status,
+    };
+  }, [events]);
+
   // Auto-scroll the transcript as text streams in. Disable when
   // the user has scrolled up to read history; re-engage when they
   // jump back to the bottom.
@@ -210,6 +226,26 @@ export function ChatZone(_: ChatZoneProps = {}) {
           </span>
         )}
       </div>
+
+      {/* v0.4.20 (event 000056): Quota nudge banner. Visible when
+          the scheduler flipped a (chief, model) pair to
+          rate_limited and emitted the chairman-mandated text. */}
+      {quotaNudge && (
+        <div
+          role="status"
+          className="mx-4 mb-1 rounded-md border border-status-warn/40 bg-status-warn/10 px-3 py-2 text-xs text-status-warn"
+        >
+          <div className="font-semibold">
+            {t('chatZone.quotaNudgeTitle', { defaultValue: 'Quota Refresh' })}
+          </div>
+          <div className="text-text-secondary">
+            {quotaNudge.summary
+              || t('chatZone.quotaNudge', {
+                defaultValue: 'AI 之前疑似到达上限，目前已经刷新，检查工作进度并且继续工作',
+              })}
+          </div>
+        </div>
+      )}
 
       {/* Input — single textarea, no surrounding controls blocking
            focus. */}

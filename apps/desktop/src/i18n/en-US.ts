@@ -434,6 +434,16 @@ const enUS: Translations = {
   'drift.message':
     '⚠ Sidecar runtime version (v{{sidecar}}) is older than the shell expects (v{{expected}}). Some features may be unavailable. Please rebuild the sidecar.',
   'drift.dismiss': 'Dismiss',
+
+// ── v0.4.20 quota tracker (event 000056) ─────────────
+  'settings.roles.quota.heading': 'Quota Status',
+  'settings.roles.quota.empty': 'All clear — no failed (role, model) pairs.',
+  'settings.roles.quota.failed': 'Failed · awaiting 5h refresh',
+  'settings.roles.quota.pending_5h_wait': 'Chief down · awaiting 5h refresh',
+  'settings.roles.quota.rate_limited': 'Stopped · click Reset',
+  'settings.roles.quota.reset': 'Reset',
+  'chatZone.quotaNudgeTitle': 'Quota Refresh',
+  'chatZone.quotaNudge': 'AI may have hit a quota limit; quota has now refreshed. Resume work.',
 };
 
 export default enUS;
