@@ -208,10 +208,24 @@ async fn events_bridge(app: tauri::AppHandle) {
                                 if let Ok(v) =
                                     serde_json::from_slice::<serde_json::Value>(&buf)
                                 {
-                                    if let Some(ev) = v.get("event") {
-                                        if let Err(e) = app.emit("wf:event", ev.clone()) {
-                                            eprintln!("[flowntier] emit wf:event failed: {e}");
-                                        }
+                                    // The events pipe is newline-delimited JSON;
+                                    // each line is a serialised value of one of
+                                    // two shapes:
+                                    //   - WfEvent   : {"event": "<kind>", ...}
+                                    //   - AgentEvent: {"kind": "<kind>", ...}
+                                    //
+                                    // Both are forwarded to the webview under
+                                    // the same `wf:event` channel — the
+                                    // frontend `useAgentStream` hook filters
+                                    // by `kind` field (AgentEvent) so WfEvent
+                                    // payloads are ignored at the JS layer.
+                                    //
+                                    // v0.4.20 bug: only the WfEvent branch
+                                    // was forwarded (v.get("event")) — chief
+                                    // AgentEvent was silently dropped, leaving
+                                    // the ChatZone transcript empty.
+                                    if let Err(e) = app.emit("wf:event", v) {
+                                        eprintln!("[flowntier] emit wf:event failed: {e}");
                                     }
                                 }
                                 buf.clear();
