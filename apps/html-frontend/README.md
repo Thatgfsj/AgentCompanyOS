@@ -1,93 +1,112 @@
-# Flowntier HTML Frontend (v0.4.21, event 000057)
+# Flowntier HTML Frontend (v0.4.21, event 000058)
 
 A **portable**, **browser-runnable** shell for the Flowntier pipe
-server. No Tauri, no bundler, no framework — just `index.html`
-and `app.js` talking to the pipe server over loopback HTTP.
+server. Wraps the **same React bundle that the Tauri desktop shell
+ships** (`apps/desktop/dist/`) in a thin `window.__TAURI_INTERNALS__`
+shim so the entire Settings + ChatZone + WorkdirSetup + quota
+panel renders unchanged inside any browser, on any OS.
 
-This exists so the chairman can drive Flowntier from **any
-browser**, on any OS, including environments where the Tauri
-desktop shell can't be built (clean macOS box, headless Linux
-server, an embedded device, a different user account, or just
-a quick `chrome.exe` from another workstation).
+The chairman's requirement was "跟应用端一模一样的前端 Flowntier".
+The shim approach is the answer: there is no second React
+codebase, no parallel UI implementation. Just the desktop
+bundle + a 30-line Tauri 2.x IPC shim that translates every
+`__TAURI_INTERNALS__.invoke(cmd, args)` call into a POST /rpc
+against the pipe server's HTTP bridge.
 
-## Architecture
+## How it works
 
 ```
-┌────────────────────────┐    HTTP+SSE (127.0.0.1:8765)    ┌──────────────────────┐
-│  index.html + app.js   │ ───────────────────────────────►│  flowntier-runtime   │
-│  (any browser)         │  POST /rpc                       │  ws_bridge.rs        │
-│                        │  GET  /events (Server-Sent)     │                      │
-│                        │  GET  /health                   │                      │
-└────────────────────────┘ ◄───────────────────────────────└──────────────────────┘
-                                                          (also named-pipe IPC
-                                                           for the Tauri shell)
+┌─────────────────────────────────┐    HTTP+SSE (loopback)    ┌──────────────────────┐
+│  dist/index.html                │ ───────────────────────► │  flowntier-runtime   │
+│  ├─ dist/tauri-shim.js          │  POST /rpc                │  ws_bridge.rs        │
+│  └─ dist/assets/index-*.js      │  GET  /events  (SSE)      │                      │
+│     (the actual desktop bundle) │  GET  /health             │                      │
+└─────────────────────────────────┘ ◄──────────────────────── └──────────────────────┘
 ```
 
-The wire format on the HTTP bridge is **identical** to the
-named-pipe transport: same JSON-RPC envelope, same `AgentEvent`
-serialisation, same `path` / `body` parameters. Handlers in
-`crates/pipe-server/src/handlers.rs` are unchanged.
-
-The bridge binds to **`127.0.0.1`** only — it is a local sidecar,
-not a network service. Override via `FLOWNTIER_HTTP_BRIDGE`
-environment variable (e.g. `FLOWNTIER_HTTP_BRIDGE=127.0.0.1:9000`).
+* `dist/tauri-shim.js` installs `window.__TAURI_INTERNALS__` with
+  three methods (`invoke`, `transformCallback`,
+  `unregisterCallback`). Every invoke maps to a FastAPI-style
+  `POST /rpc` against the bridge. Event subscriptions (`listen()`)
+  are wired to the SSE stream.
+* The shim has an explicit `CMD_MAP` (≈40 entries) that maps each
+  Tauri command name (`list_providers`, `save_secret`,
+  `get_role_resolve_status`, …) to its `(method, pathTemplate)`
+  against the pipe server. Adding a new command = one row in the
+  map.
+* `dist/index.html` loads the shim FIRST, then the desktop
+  bundle (`assets/index-B4g6M-ob.js`). The bundle calls into
+  `__TAURI_INTERNALS__` exactly like the Tauri shell does — no
+  code change in the desktop React codebase.
 
 ## Running it
 
-1. Start the pipe server:
+1. Start the pipe-server with the HTTP bridge bound to a free
+   loopback port. The default 8765 may collide with another
+   service (Python MCP, dev tools); use 18765 if so:
+
    ```bash
-   cargo run -p pipe-server --bin flowntier-runtime
+   # pick a port that's free: netstat -ano | grep ":PORT"
+   FLOWNTIER_HTTP_BRIDGE=127.0.0.1:18765 \
+       /path/to/flowntier-runtime.exe
    ```
-   You should see `v0.4.21: HTTP+SSE bridge listening (loopback only)` in the log.
 
-2. Open the frontend in any browser:
-   ```bash
-   cd apps/html-frontend
-   python -m http.server 8000  # or any static file server
-   # then open http://localhost:8000/index.html
-   ```
-   Or just double-click `index.html` — `fetch()` works from
-   `file://` against loopback HTTP.
+   Or copy the `flowntier-runtime.exe` shipped to your desktop
+   and run it directly. (The NSIS-installed runtime at
+   `O:\Flowntier\flowntier_runtime.exe` is the **v0.4.20**
+   build — it doesn't ship the bridge, so the HTML frontend
+   won't work until the chairman replaces it with the
+   v0.4.21 runtime; see `~/Desktop/flowntier-runtime-v0.4.21.exe`.)
 
-3. Type a message into the chat input, click 发送. The frontend
-   POSTs `POST /api/run_task` to the bridge, the pipe server
-   streams AgentEvents back over `/events`, and the transcript
-   fills in live.
+   You should see `[bridge] listening on 127.0.0.1:18765` in the
+   console (stderr).
 
-4. The right pane polls `GET /api/quota/status` every 15 s and
-   shows the chairman-mandated quota state per `(role, model)`
-   pair. Click **重置** on a `rate_limited` row to clear it.
+2. Open `dist/index.html` in any browser. The shim auto-discovers
+   the bridge on `127.0.0.1:18765`; if you used a different
+   port, set `localStorage.flnwttier.bridge = "http://127.0.0.1:NNNN"`
+   in the browser devtools and reload.
 
-## Switching language
+3. The full Flowntier UI renders: language picker (zh-CN /
+   en-US), role picker, chat input + transcript, Settings panel
+   with provider management, secret editor, role assignments,
+   quota status block, nudge banner, workdir setup. **Identical
+   to the desktop bundle.**
 
-Use the language picker in the header (中文 / English). The
-choice persists in `localStorage`.
+## What shim translates
+
+Tauri 2.x's `@tauri-apps/api/event` (`listen` / `emit` /
+`once`) is implemented in terms of `__TAURI_INTERNALS__.invoke`
+with cmd names `plugin:event|listen` / `plugin:event|unlisten`.
+The shim intercepts those commands and wires them to the
+`/events` SSE stream — each SSE message becomes a fan-out to
+every `listen()` subscriber. `transformCallback(cb)` allocates a
+local id and stores the JS callback in a map; when SSE delivers
+an AgentEvent, the shim looks up the callback by id and invokes
+it with `{event, payload}` exactly like Tauri's main thread
+would.
 
 ## CORS
 
 The bridge responds with `Access-Control-Allow-Origin: *` and
-handles `OPTIONS` preflight, so any browser, any origin, can
-drive it. **Do not** expose port 8765 to the network — the
-chairman should `ssh -L` tunnel if remote access is needed.
+handles `OPTIONS` preflight. The HTML frontend can therefore be
+served from any origin (or from `file://`) and still drive the
+loopback bridge.
 
-## What's intentionally NOT here
+## Why we don't reuse the named-pipe transport
 
-The Tauri desktop shell has ~1500 lines of provider-management
-UI (toggle / patch / add custom / fetch model list / etc.). The
-HTML frontend ships **only** ChatZone + Quota Status, because
-the chairman's primary use case is "chat from anywhere" + "see
-quota state without launching the desktop shell".
+Browsers can't read named pipes (`\\.\pipe\...`) or Unix domain
+sockets. Period. That's why we built the HTTP bridge at all.
+The desktop bundle was happy with named pipes; the browser host
+needs HTTP. The shim bridges the gap on the browser side without
+needing pipe-server or the desktop shell to change.
 
-The provider-management endpoints (`GET /api/providers`,
-`PATCH /api/providers/{id}`, `PUT /api/settings/secrets/{name}`,
-`GET /api/router/roles`, `PUT /api/router/roles`, etc.) are all
-already exposed via `POST /rpc` — you can drive them from the
-browser devtools console:
+## What's NOT here (deferred to v0.5)
 
-```js
-await rpc('GET', '/api/providers')
-await rpc('PUT', '/api/router/roles', { roles: [{ role: 'agent:chief', default_model: 'minimax:MiniMax-Text-01', fallback_chain: [] }] })
-```
+* WorkdirSetup flows that rely on Tauri's `dialog` plugin
+  (file pickers). The HTML frontend can drive workdir setting
+  via `set_workdir(path)` (the shim handles this), but the file
+  picker dialog has to be a plain HTML `<input type="file">`
+  that we'll add when needed.
 
-A v0.5 follow-up will add a Settings pane to the HTML frontend
-that wraps these calls in UI.
+* Native menus, native notifications. These are Tauri-side
+  concerns that don't translate to a browser tab.

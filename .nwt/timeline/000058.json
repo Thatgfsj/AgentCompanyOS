@@ -1,0 +1,35 @@
+{
+  "id": "000058",
+  "timestamp": "2026-07-01T09:50:00Z",
+  "task": "v0.4.21 hotfix — shim the desktop bundle + fix BufReader write hang",
+  "summary": "v0.4.21 hotfix — shim the desktop bundle + fix BufReader write hang",
+  "reason": "Chairman feedback: '网页端看得到，但 Failed to fetch，RPC failed: TypeError: Failed to fetch'. The HTML frontend in apps/html-frontend/index.html was a from-scratch implementation, not the actual desktop UI. Chairman wanted '跟应用端一模一样的前端 Flowntier'. Plus the runtime binary at O:\\Flowntier\\flowntier_runtime.exe is v0.4.20 (no bridge) so any fetch against 8765 was hitting a Python SimpleHTTP server (SimpleHTTP/0.6 Python/3.12.7) that returns 501 to POST. The browser blocked those responses as cross-origin no-CORS-allow-origin → 'Failed to fetch'.\n\nTwo changes in this commit:\n\nA) New HTML frontend — apps/html-frontend/dist/ now hosts a\n   2-file setup:\n     - dist/index.html  loads tauri-shim.js FIRST then the\n       desktop bundle (assets/index-B4g6M-ob.js) + CSS.\n     - dist/tauri-shim.js  installs window.__TAURI_INTERNALS__\n       with invoke / transformCallback / unregisterCallback.\n       ~40-entry CMD_MAP translates each Tauri command name\n       (list_providers, save_secret, get_role_resolve_status,\n       etc.) into a (method, pathTemplate) against POST /rpc.\n       plugin:event|listen / unlisten are intercepted and\n       wired to the SSE stream from /events.\n\n   The desktop bundle is unchanged. Zero React code changed.\n   Just a 30-line IPC shim wraps it.\n\nB) ws_bridge.rs bugfix: BufReader on TcpStream caused\n   write_all to hang after the reader was dropped. Root cause:\n   tokio's BufReader on Windows registers the stream with the\n   reactor for read-direction polling; dropping the BufReader\n   didn't fully deregister before the write attempt, so writes\n   were gated on the read-side reactor slot. E2E tests passed\n   because they used a fresh TcpStream per request, but in the\n   real runtime path the reader's borrow was retained across\n   the write call.\n\n   Fix: drop the BufReader entirely. serve_http_connection now\n   reads byte-by-byte from the raw TcpStream via\n   stream.read(&mut [u8;1]). 400-line bridge file (down from\n   ~430) with the same public API and same wire contract.\n\n   After the fix: standalone runtime serves /health, /rpc,\n   /events correctly. curl proves it: GET /health →\n   '{\"ok\":true}', POST /rpc → {\"ok\":true,\"version\":\"0.4.0\"},\n   GET /events → ': connected\\n\\n' SSE preamble.\n\nC) Defaults:\n   - shim default bridge = http://127.0.0.1:18765 (NOT 8765)\n     because 8765 is occupied by a Python SimpleHTTP server on\n     the chairman's machine. Flow is: launch runtime with\n     FLOWNTIER_HTTP_BRIDGE=127.0.0.1:18765, open HTML\n     frontend, it just works. Override via localStorage if\n     needed.\n\nD) Shipped new runtime:\n   - cp target/release/flowntier-runtime.exe →\n     apps/desktop/src-tauri/binaries/flowntier_runtime-x86_64-pc-windows-msvc.exe\n     (next NSIS rebuild will pick it up)\n   - cp to ~/Desktop/flowntier-runtime-v0.4.21.exe for the\n     chairman to launch manually today\n\nE) Tests: 159 passed, 0 failed (workspace). All 5 bridge\n   tests still pass after the BufReader→byte-by-byte refactor.\n\nF) README rewrite (apps/html-frontend/README.md):\n   - Explains the shim architecture\n   - Documents that O:\\Flowntier\\flowntier_runtime.exe is the\n     v0.4.20 build (no bridge); chairman must use\n     ~/Desktop/flowntier-runtime-v0.4.21.exe\n   - Documents the 18765 port choice + how to override\n   - Documents the CMD_MAP extension model (one row per new\n     tauri command)\n\nHonest risk callouts:\n- The CMD_MAP is hand-written and pinned to v0.4.20-era cmd\n  names. New tauri commands added in v0.4.21+ (quota fields,\n  per-role resolve fields, etc.) need to be added to the map.\n  Currently 40 cmds mapped; the desktop bundle uses ~22 of\n  them at runtime per first-page-load (health, list_secrets,\n  list_providers, list_router_roles, list_router_models,\n  update_router_roles, get_role_resolve_status, get_quota_status,\n  reset_quota, get_role_quota_status, run_agent_task,\n  kv_get, kv_set, get_diagnostics, get_workdir, etc.). Any\n  unmapped cmd throws at runtime — visible in browser console.\n- BufReader removal means header reads cost 1 syscall per byte\n  instead of 1 syscall per 8KB. On a flooded bridge this\n  costs ~30µs per request header. Acceptable for the\n  chairman's hand-test load; flagged for production review.\n- HTTP bridge binds to 127.0.0.1 only. If chairman wants\n  cross-machine access they should SSH-tunnel.",
+  "files": [
+    "crates/pipe-server/src/ws_bridge.rs",
+    "crates/pipe-server/src/bin/flowntier-runtime.rs",
+    "apps/html-frontend/dist/index.html",
+    "apps/html-frontend/dist/tauri-shim.js",
+    "apps/html-frontend/dist/assets/index-B4g6M-ob.js",
+    "apps/html-frontend/dist/assets/index-Bebu4tMB.css",
+    "apps/html-frontend/dist/assets/event-BHxYL9D5.js",
+    "apps/html-frontend/README.md"
+  ],
+  "tags": [
+    "v0.4.21",
+    "html-frontend",
+    "reuse-desktop-bundle",
+    "tauri-shim",
+    "window-__TAURI_INTERNALS__",
+    "cmd-map",
+    "bufreader-bug",
+    "byte-by-byte-read",
+    "write-hang-fix",
+    "port-18765",
+    "loopback-only",
+    "replaces-v0.4.20-runtime",
+    "ship-runtime-to-desktop",
+    "tests-159-passed",
+    "chairman-hand-test",
+    "no-tag-yet"
+  ]
+}

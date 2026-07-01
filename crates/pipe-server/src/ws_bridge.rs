@@ -87,15 +87,21 @@ pub async fn run_http_bridge_on(
 ) -> std::io::Result<()> {
     let addr = listener.local_addr()?;
     info!(bind = %addr, "v0.4.21: HTTP+SSE bridge listening (loopback only)");
+    // Debug log to stderr — bypassing tracing subscriber (runtime
+    // doesn't init one). Stdout buffer is also unreliable when
+    // the process is spawned with stdio=null.
+    eprintln!("[bridge] listening on {addr}");
 
     loop {
         let (stream, peer) = match listener.accept().await {
             Ok(v) => v,
             Err(e) => {
                 error!(error = %e, "http_bridge: accept failed");
+                eprintln!("[bridge] accept failed: {e}");
                 continue;
             }
         };
+        eprintln!("[bridge] accepted from {peer}");
         // Defence in depth: refuse non-loopback peers. The bind is
         // already 127.0.0.1, but if someone restarts with a wider
         // bind we still bail.
@@ -127,18 +133,22 @@ async fn serve_http_connection(
     dispatcher: Arc<Dispatcher>,
     events_tx: broadcast::Sender<AgentEvent>,
 ) -> std::io::Result<()> {
-    let mut reader = BufReader::new(&mut stream);
+    eprintln!("[bridge] serve_http_connection started");
+    use tokio::io::AsyncReadExt;
 
-    // 1. Read headers until we see `\r\n\r\n`. Tokio's
-//    `read_until` only supports a single byte terminator, so
-//    we read until `\n` then check for the full CRLFCRLF.
+    // Read headers byte-by-byte (no BufReader — see notes in
+    // /bridge/handlers below). We read directly from the
+    // TcpStream so the read-side reactor registration doesn't
+    // interfere with the subsequent write.
     let mut header_buf: Vec<u8> = Vec::with_capacity(1024);
     loop {
-        match reader.read_until(b'\n', &mut header_buf).await {
-            Ok(0) => return Ok(()),
-            Ok(_) => {}
-            Err(_) => return write_400(&mut stream, "header read failed").await,
+        let mut byte = [0u8; 1];
+        let n = stream.read(&mut byte).await?;
+        if n == 0 {
+            // EOF before CRLFCRLF.
+            return Ok(());
         }
+        header_buf.push(byte[0]);
         if header_buf.windows(4).any(|w| w == b"\r\n\r\n") {
             break;
         }
@@ -147,21 +157,15 @@ async fn serve_http_connection(
         }
     }
     let header_n = header_buf.len();
+    eprintln!(
+        "[bridge] headers complete ({} bytes): {:?}",
+        header_n,
+        std::str::from_utf8(&header_buf[..header_n]).unwrap_or("<bin>")
+    );
 
-    // 2. Split header vs body bytes. BufReader's internal buffer
-    //    may already contain body bytes that were read past
-    //    `\r\n\r\n` — pull them out via fill_buf + consume.
-    let leftover_in_buffer;
-    {
-        let already_in_internal = reader.fill_buf().await?;
-        leftover_in_buffer = already_in_internal.to_vec();
-        let consumed = already_in_internal.len();
-        reader.consume(consumed);
-    }
-    let mut leftover = header_buf.split_off(header_n);
-    leftover.extend_from_slice(&leftover_in_buffer);
-
-    let header_str = match std::str::from_utf8(&header_buf) {
+    // No leftover handling — first version reads body via
+    // Content-Length after parsing headers.
+    let header_str = match std::str::from_utf8(&header_buf[..header_n]) {
         Ok(s) => s,
         Err(_) => return write_400(&mut stream, "non-UTF8 headers").await,
     };
@@ -187,31 +191,33 @@ async fn serve_http_connection(
     // CORS preflight (browsers auto-issue OPTIONS).
     if method == "OPTIONS" {
         write_cors_preflight(&mut stream).await?;
-        stream.shutdown().await?;
+        let _ = stream.shutdown().await;
         return Ok(());
     }
 
+    let mut leftover: Vec<u8> = Vec::new();
+
     match (method.as_str(), path.as_str()) {
-        ("GET", "/health") => write_health(&mut stream).await?,
+        ("GET", "/health") => {
+            eprintln!("[bridge] /health");
+            write_health(&mut stream).await?;
+        }
         ("POST", "/rpc") => {
-            // Drop the BufReader borrow before passing &mut stream
-            // to handlers that need both halves.
-            drop(reader);
-            handle_rpc(&mut stream, &headers, dispatcher, &mut leftover).await?
+            eprintln!("[bridge] /rpc");
+            handle_rpc(&mut stream, &headers, dispatcher, &mut leftover).await?;
         }
         ("GET", "/events") => {
-            drop(reader);
+            eprintln!("[bridge] /events");
             handle_events(&mut stream, events_tx).await?;
-            // /events is a streaming response that never closes
-            // on its own; we don't reach the shutdown line below.
             return Ok(());
         }
-        _ => write_404(&mut stream).await?,
+        _ => {
+            eprintln!("[bridge] 404 {method} {path}");
+            write_404(&mut stream).await?;
+        }
     }
-    // Half-close the write side so clients reading until EOF
-    // (e.g. our test harness, browsers using fetch() without
-    // keep-alive) get a clean EOF instead of a TCP timeout.
-    stream.shutdown().await?;
+    // Half-close the write side.
+    let _ = stream.shutdown().await;
     Ok(())
 }
 
@@ -220,8 +226,9 @@ async fn serve_http_connection(
 /// browsers always set it for fetch().
 ///
 /// `leftover` holds bytes that arrived past the `\r\n\r\n`
-/// terminator (BufReader's internal buffer). We drain them first,
-/// then read the rest from the stream.
+/// terminator (in this implementation always empty since we
+/// read byte-by-byte). We drain them first, then read the rest
+/// from the stream.
 async fn handle_rpc(
     stream: &mut TcpStream,
     headers: &std::collections::HashMap<String, String>,
@@ -244,8 +251,7 @@ async fn handle_rpc(
     let take = leftover.len().min(content_length);
     body[..take].copy_from_slice(&leftover[..take]);
     leftover.clear();
-    // Read the rest directly from the stream (no BufReader — we
-    // dropped it before calling this handler).
+    use tokio::io::AsyncReadExt;
     let mut cursor = take;
     while cursor < content_length {
         let n = stream.read(&mut body[cursor..]).await?;
@@ -381,9 +387,20 @@ async fn write_json_bytes(
          \r\n",
         body.len(),
     );
-    w.write_all(header.as_bytes()).await?;
-    w.write_all(body).await?;
-    w.flush().await
+    let full = [header.as_bytes(), body].concat();
+    eprintln!("[bridge] write_json_bytes async write_all ({} bytes)", full.len());
+    w.write_all(&full).await?;
+    eprintln!("[bridge] write_json_bytes async write returned");
+    // Force the kernel to flush + send FIN so the client
+    // receives the data immediately. Without this, the buffer
+    // sits in tokio's internal writer until the runtime
+    // shutdowns the socket, by which point the client has
+    // already timed out.
+    use tokio::io::AsyncWriteExt;
+    let _ = w.flush().await;
+    let _ = w.shutdown().await;
+    eprintln!("[bridge] write_json_bytes shutdown done");
+    Ok(())
 }
 
 /// Resolve the bind address from env. Lets chairman override for

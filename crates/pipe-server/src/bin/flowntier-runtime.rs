@@ -71,13 +71,15 @@ async fn main() -> std::io::Result<()> {
     // Dies with the runtime process.
     let bind = pipe_server::ws_bridge::bind_from_env();
     let dispatcher_for_bridge = state.dispatcher().expect("dispatcher wired by register_all");
+    let events_for_bridge = state.events.clone();
     let bridge = tokio::spawn(run_http_bridge(
         bind,
         dispatcher_for_bridge,
-        state.events.clone(),
+        events_for_bridge,
     ));
 
-    let server = Server::new(cfg, d, state.events.clone());
+    let events_for_server = state.events.clone();
+    let server = Server::new(cfg, d, events_for_server);
     tokio::select! {
         r = server.run() => r,
         _ = bridge => Ok(()),
