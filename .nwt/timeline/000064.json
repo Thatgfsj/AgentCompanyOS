@@ -1,0 +1,21 @@
+{
+  "id": "000064",
+  "timestamp": "2026-07-02T01:45:00Z",
+  "task": "Fix dashboard '任务列表 0/0 完成' — wire run_task → tasks table + auto-upsert synthetic wf_chat_* workflows row + dispatcher ?query stripping",
+  "summary": "Three-part fix for the dashboard's '任务列表 0/0 完成' panel:\n\n1. **handlers.rs run_task**: writes a single tasks row per chat call (Task struct, ulid id, chief/role assignment, result summary).\n\n2. **ensure_workflow_row (storage.rs)**: tasks.wf_id has a FK to workflows.id with foreign_keys=true, but chat-derived wf_chat_* ids don't have a matching workflow. Added `INSERT OR IGNORE INTO workflows` so the FK never blocks the tasks insert. Idempotent, safe under concurrent chat tasks with the same synthetic id.\n\n3. **dispatcher.rs**: stripped `?query` from incoming path before handler lookup, parsed query params into the body. Without this, `/api/tasks?wf_id=...` returned 'no handler registered for GET /api/tasks?wf_id=...'.\n\nVerified end-to-end: POST /api/run_task (chief + minimax) writes row to tasks table; GET /api/tasks?wf_id=wf_chat_xxx returns {done, total, rows}. 21/21 pipe-server tests pass.",
+  "reason": "Chairman reported dashboard showed '任务列表 0/0 完成' even after chief completed a real task. Root cause was a foreign-key constraint, not a missing write — the create_task path ran silently but the INSERT was rolled back. Sidecar stderr was being nulled by Tauri shell sidecar spawn, hiding the warn log. Found by manual sqlite INSERT reproducing the failure mode.",
+  "files": [
+    "crates/storage/src/lib.rs",
+    "crates/pipe-server/src/handlers.rs",
+    "crates/pipe-server/src/dispatcher.rs"
+  ],
+  "tags": [
+    "dashboard",
+    "tasks-table",
+    "foreign-key",
+    "ensure-workflow-row",
+    "dispatcher-query-string",
+    "event-000064",
+    "bug-fix"
+  ]
+}

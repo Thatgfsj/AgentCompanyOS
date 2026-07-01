@@ -44,8 +44,8 @@
   const BRIDGE = (() => {
     try {
       const override = localStorage.getItem('flowntier.bridge');
-      return override || 'http://127.0.0.1:18765';
-    } catch { return 'http://127.0.0.1:18765'; }
+      return override || 'http://127.0.0.1:8765';
+    } catch { return 'http://127.0.0.1:8765'; }
   })();
 
   // ── Cmd → {method, pathTemplate, body?} ──────────────────────

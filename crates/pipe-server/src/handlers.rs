@@ -264,6 +264,60 @@ pub fn register_all(d: &mut Dispatcher, state: ServerState) {
         })
     });
 
+    // v0.4.21 (event 000064): GET /api/tasks?wf_id=... returns
+    // the persisted task list for a workflow so the dashboard's
+    // "任务列表 0/0 完成" panel can show real progress. Before
+    // this fix the tasks table was always empty — the run_task
+    // handler wrote AgentEvents but never INSERT INTO tasks.
+    let s_tasks = state.clone();
+    d.register("GET", "/api/tasks", move |body| {
+        let s = s_tasks.clone();
+        let wf_id = body.get("wf_id").and_then(|v| v.as_str())
+            .unwrap_or("").to_string();
+        Box::pin(async move {
+            if wf_id.is_empty() {
+                return Ok((400, json!({
+                    "ok": false,
+                    "error": "missing 'wf_id'",
+                })));
+            }
+            match s.repo.list_tasks_for(&wf_id).await {
+                Ok(rows) => {
+                    let items: Vec<Value> = rows.into_iter().map(|t| json!({
+                        "id": t.id,
+                        "wf_id": t.wf_id,
+                        "parent_id": t.parent_id,
+                        "title": t.title,
+                        "status": t.status,
+                        "assigned_to": t.assigned_to,
+                        "model": t.model,
+                        "repair_count": t.repair_count,
+                        "input_tokens": t.input_tokens,
+                        "output_tokens": t.output_tokens,
+                        "cost_usd": t.cost_usd,
+                        "files_modified": t.files_modified,
+                        "started_at": t.started_at,
+                        "finished_at": t.finished_at,
+                        "result": t.result,
+                    })).collect();
+                    let (done, total) = s.repo.count_tasks(&wf_id).await
+                        .unwrap_or((0, 0));
+                    Ok((200, json!({
+                        "ok": true,
+                        "wf_id": wf_id,
+                        "done": done,
+                        "total": total,
+                        "rows": items,
+                    })))
+                }
+                Err(e) => Ok((500, json!({
+                    "ok": false,
+                    "error": format!("list_tasks: {e}"),
+                }))),
+            }
+        })
+    });
+
     // ── v0.4.20: GET /api/router/roles/{role}/resolve ──────
     // Returns {ok:true, role, provider_short, model_id, base_url,
     // api_kind, has_key, fallback_chain, quota_status} on
@@ -1439,6 +1493,9 @@ async fn run_task(body: Value, state: Arc<ServerState>) -> Result<(u16, Value), 
     );
 
     // ── Stream events to subscribers while running ────────────
+    // Keep a copy of the task_text so we can write it into the
+    // tasks row at the end (v0.4.21 event 000064).
+    let task_text_for_record = task_text.clone();
     let mut rx = agent.run(task_text);
     let mut last_status = "UNKNOWN".to_string();
     let mut summary: Option<String> = None;
@@ -1500,12 +1557,93 @@ async fn run_task(body: Value, state: Arc<ServerState>) -> Result<(u16, Value), 
         }
     }
 
+    // v0.4.21 (event 000064): persist a task row so the
+    // dashboard's "任务列表" panel shows real progress. The
+    // tasks table was always empty before this fix (run_task
+    // only wrote AgentEvents, never INSERT INTO tasks), so the
+    // chairman always saw "0/0 完成" no matter how much chief
+    // actually did. We write a single row per run_task call,
+    // with the role as `assigned_to` and the final status as
+    // `status` (done | failed | aborted). The result column
+    // stores the summary so the chairman can re-read it.
+    let now = chrono::Utc::now().timestamp();
+    let wf_id_for_task = if wf_id.is_empty() {
+        // v0.4.19+ chat path doesn't always carry a wf_id
+        // (run_task handler's wf_id comes from the legacy
+        // "run_agent_task" body). Synthesise a stable per-chat
+        // wf_id from user_request + role + now so the task is
+        // grouped under something the chairman can recognise.
+        let key = format!("{}|{}|{}", role, model_for_quota, task_text_for_record);
+        let mut h: u64 = 1469598103934665603;
+        for b in key.as_bytes() {
+            h ^= *b as u64;
+            h = h.wrapping_mul(1099511628211);
+        }
+        format!("wf_chat_{:016x}", h)
+    } else {
+        wf_id.clone()
+    };
+    // v0.4.21 (event 000064 follow-up): the tasks table has a
+    // FK constraint (`wf_id REFERENCES workflows(id)`) and the
+    // storage crate enables `foreign_keys=true` per-connection.
+    // For chat-derived wf_ids (synthesised above) there is no
+    // matching row in `workflows`, so the INSERT into tasks
+    // would fail and the dashboard would still see "0/0 完成".
+    // Fix: ensure a workflow row exists for the synthetic id.
+    // Use `INSERT OR IGNORE` so concurrent chat tasks with the
+    // same wf_chat_* id don't fight — the FIRST one creates the
+    // row, the rest no-op. Real (non-synthetic) wf_ids already
+    // have a workflows row from the dispatcher, but we still
+    // call this — the OR IGNORE makes it safe and idempotent.
+    let wf_insert = state.repo.ensure_workflow_row(
+        &wf_id_for_task,
+        &task_text_for_record,
+        &status_clean,
+    ).await;
+    if let Err(e) = wf_insert {
+        warn!("v0.4.21 (event 000064 follow-up): ensure_workflow_row failed for {wf_id_for_task}: {e}");
+    }
+    let task_id = format!("t_{}", ulid::Ulid::new());
+    let status_for_task = status_clean.clone();
+    let title = if task_text_for_record.chars().count() > 60 {
+        let truncated: String = task_text_for_record.chars().take(60).collect();
+        format!("{truncated}…")
+    } else {
+        task_text_for_record.clone()
+    };
+    let task_result = state.repo.create_task(&storage::Task {
+        id: task_id.clone(),
+        wf_id: wf_id_for_task.clone(),
+        parent_id: None,
+        title,
+        status: status_for_task.to_lowercase(),
+        assigned_to: Some(role.clone()),
+        model: Some(model_for_quota.clone()),
+        repair_count: 0,
+        input_tokens: 0,
+        output_tokens: 0,
+        cost_usd: None,
+        files_modified: None,
+        started_at: Some(now),
+        finished_at: Some(now),
+        result: summary.clone(),
+    }).await;
+    if let Err(e) = task_result {
+        // Log but do not fail the run_task response — the agent
+        // work already succeeded, the dashboard just won't see
+        // a new task row this time. This is the path that was
+        // silently dropped before event 000064.
+        warn!("v0.4.21 (event 000064): create_task failed for {task_id}: {e}");
+    }
+
     Ok((
         200,
         json!({
             "ok": true,
             "status": last_status,
             "summary": summary,
+            "task_id": task_id,
+            "wf_id": wf_id_for_task,
         }),
     ))
 }

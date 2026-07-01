@@ -104,6 +104,49 @@ impl Dispatcher {
         let path = req.params.path;
         let mut body = req.params.body.unwrap_or(Value::Null);
 
+        // v0.4.21 (event 000064 follow-up): strip `?query` from
+        // the path so handlers registered on the bare path
+        // (`/api/tasks`) still match when the caller appends
+        // query parameters (`/api/tasks?wf_id=...`). Also parse
+        // the query into the body so handlers can read params
+        // via `body.get("wf_id")` instead of having to re-parse
+        // the query themselves.
+        let (path, query) = match path.split_once('?') {
+            Some((p, q)) => (p.to_string(), q),
+            None => (path.clone(), ""),
+        };
+        if !query.is_empty() {
+            if let Value::Object(ref mut map) = body {
+                for pair in query.split('&') {
+                    if let Some((k, v)) = pair.split_once('=') {
+                        map.insert(
+                            k.to_string(),
+                            Value::String(
+                                urldecode(v).unwrap_or_else(|| v.to_string()),
+                            ),
+                        );
+                    } else if !pair.is_empty() {
+                        map.insert(pair.to_string(), Value::Bool(true));
+                    }
+                }
+            } else {
+                let mut map = serde_json::Map::new();
+                for pair in query.split('&') {
+                    if let Some((k, v)) = pair.split_once('=') {
+                        map.insert(
+                            k.to_string(),
+                            Value::String(
+                                urldecode(v).unwrap_or_else(|| v.to_string()),
+                            ),
+                        );
+                    } else if !pair.is_empty() {
+                        map.insert(pair.to_string(), Value::Bool(true));
+                    }
+                }
+                body = Value::Object(map);
+            }
+        }
+
         // 1. Exact match.
         if let Some(handler) = self.handlers.get(&(method.clone(), path.clone())) {
             return match handler(body).await {
@@ -241,5 +284,65 @@ mod tests {
         // dispatch with uppercase GET should still find it.
         let resp = d.dispatch(1, req("GET", "/api/ping")).await;
         assert_eq!(resp.result.unwrap().status, 200);
+    }
+
+    /// v0.4.21 (event 000064 follow-up): dispatch should strip
+    /// `?query` from the path so handlers registered on the bare
+    /// path still match. Query parameters are merged into the
+    /// body so handlers can read them via `body.get(...)`.
+    #[tokio::test]
+    async fn dispatch_strips_query_string() {
+        let mut d = Dispatcher::new();
+        d.register("GET", "/api/tasks", |body| {
+            Box::pin(async move {
+                let wf_id = body.get("wf_id").and_then(|v| v.as_str()).unwrap_or("");
+                Ok((200, serde_json::json!({"wf_id": wf_id})))
+            })
+        });
+        let resp = d
+            .dispatch(1, req("GET", "/api/tasks?wf_id=abc123"))
+            .await;
+        let r = resp.result.expect("ok");
+        assert_eq!(r.status, 200);
+        assert_eq!(r.body.get("wf_id").and_then(|v| v.as_str()), Some("abc123"));
+    }
+}
+
+/// v0.4.21: minimal URL-decode for query-string values. Handles
+/// `%XX` hex escapes plus `+` → space (form-encoding style).
+/// Used by [Dispatcher::dispatch] to expose query params as
+/// string values in the request body.
+fn urldecode(s: &str) -> Option<String> {
+    let mut out = String::with_capacity(s.len());
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        match b {
+            b'+' => {
+                out.push(' ');
+                i += 1;
+            }
+            b'%' if i + 2 < bytes.len() => {
+                let hi = hex_digit(bytes[i + 1])?;
+                let lo = hex_digit(bytes[i + 2])?;
+                out.push((hi * 16 + lo) as char);
+                i += 3;
+            }
+            b => {
+                out.push(b as char);
+                i += 1;
+            }
+        }
+    }
+    Some(out)
+}
+
+fn hex_digit(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
     }
 }

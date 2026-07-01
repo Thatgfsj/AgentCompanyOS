@@ -44,7 +44,7 @@ use std::sync::Arc;
 
 use agent_core::AgentEvent;
 use serde_json::Value;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
