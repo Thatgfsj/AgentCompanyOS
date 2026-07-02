@@ -1,0 +1,19 @@
+{
+  "id": "000067",
+  "timestamp": "2026-07-02T21:55:00Z",
+  "task": "Bump version 0.4.21 → 0.4.22, refresh desktop installer, ship to GitHub release v0.4.22",
+  "summary": "Chairman asked for two things:\n1. '桌面上没放' — installer copy now lives at `C:\\Users\\thatg\\Desktop\\Flowntier_0.4.22_x64-setup.exe` (MD5 b225c64403a71df14bf48dbd0cf6ed0a).\n2. '版本号改到 0.4.22' — bumped `apps/desktop/src-tauri/tauri.conf.json` and `apps/desktop/package.json`. Workspace crate versions stay at 0.4.0 (not user-visible).\n\nAlso had to kill PID 15348 — a stray background `flowntier_runtime.exe` from earlier testing that was holding an exclusive lock on `O:\\Flowntier\\flowntier_runtime.exe`. NSIS patch (b) (taskkill belt-and-braces) is designed to handle this on install, but during the build pipeline it's `cargo-tauri` that's racing the runtime for the file. Resolution: `taskkill /F /IM flowntier_runtime.exe /T` then re-run `pnpm tauri build`.\n\nNew release:\n- GitHub: https://github.com/Thatgfsj/Flowntier/releases/download/v0.4.22/Flowntier_0.4.22_x64-setup.exe\n- Tag: v0.4.22 (release id 348077261)\n- Size: 8,574,597 bytes\n- sidecar MD5: 2e1dde3cdfe1e2bb65b689c60bbf50c4 (same as event 000066; cargo build output reused because the source code didn't change between 0.4.21 and 0.4.22 — only the product version string bumped)\n- All 3 NSIS patches embedded (a) CheckIfAppIsRunning sidecar / (b) taskkill belt-and-braces / (c) Node.js check.",
+  "reason": "Chairman: '桌面上没放' / 'GitHub 这个版本改到 0.4.22'. Was non-obvious the previous installer existed at all under the workspace dir; placing it on the desktop is the easiest way to make it discoverable. Bumping 0.4.21 → 0.4.22 signals 'this is the post-event-000066 build' and matches the GitHub release tag.",
+  "files": [
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/package.json",
+    "C:/Users/thatg/Desktop/Flowntier_0.4.22_x64-setup.exe"
+  ],
+  "tags": [
+    "version-bump",
+    "0.4.22",
+    "release",
+    "desktop-copy",
+    "event-000067"
+  ]
+}
