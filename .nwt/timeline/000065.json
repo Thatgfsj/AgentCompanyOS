@@ -1,0 +1,20 @@
+{
+  "id": "000065",
+  "timestamp": "2026-07-02T07:50:00Z",
+  "task": "Rebuild Win NSIS installer containing event 000064 dashboard fix + GitHub release v0.4.21",
+  "summary": "Rebuilt Win NSIS installer on the windows-gnu target triple so the sidecar binary embedded inside the installer carries the event 000064 fix (ensure_workflow_row + dispatcher ?query stripping). Verified by extracting the resulting setup.exe with 7z: embedded flowntier_runtime.exe is byte-identical to the source sidecar (MD5 ad389cf5de756240300d6abd2825d8a4) and contains both v0.4.21 (event 000064) log markers.\n\nAlso fixed a latent bug in scripts/patch-nsis.cjs that the rebuild surfaced: NSIS uses brace-less Function blocks (Function .onInit followed directly by the body, closed with FunctionEnd), but the patch (b) script was looking for a '{' to anchor its insert position. The first '{' in the file came from a macro in the header, so the taskkill belt-and-braces block was injected at the very top of installer.nsi, leaving a stray '${' on line 467 that aborted makensis with 'Invalid command: ${'. Fix: insert immediately after 'Function .onInit\\n', skip the brace hunt entirely.\n\nPublished release v0.4.21 via the GitHub REST API (gh CLI on this box is broken). Asset URL: https://github.com/Thatgfsj/Flowntier/releases/download/v0.4.21/Flowntier_0.4.21_x64-setup.exe (8,539,241 bytes).\n\nSide investigation: MiniMax-M3 was confirmed via web research as a valid model (released 2026-06-01, flagship on api.minimaxi.com/v1 with 1M context and thinking param). The earlier 500/999 'unknown error' from the tarot smoke test was the MiniMax server-side catch-all code 1000, not a model-not-found error. Latest run hit 529 'overloaded_error' — server-side throttling, will recover in 1-5 minutes per the official error-code doc.",
+  "reason": "Chairman: '桌面放个，github更新一下，nwt更新一下'. The desktop NSIS bundle under target/release/bundle/nsis/ was 0.4.21 from 7/2 00:29 — built BEFORE the event 000064 fix landed (which only merged at 01:38). Anyone installing that package would still see the dashboard bug. Need a rebuild that includes the fix. Also: discovered patch-nsis.cjs has a latent bug that broke every NSIS rebuild after the sidecar refresh — the windows-gnu target's installer.nsi was being patched in the wrong spot, which is why the build kept aborting at makensis.",
+  "files": [
+    "scripts/patch-nsis.cjs",
+    "target/x86_64-pc-windows-gnu/release/bundle/nsis/Flowntier_0.4.21_x64-setup.exe"
+  ],
+  "tags": [
+    "release",
+    "v0.4.21",
+    "nsis",
+    "github-release",
+    "patch-nsis-bugfix",
+    "minimax-M3-verified",
+    "event-000065"
+  ]
+}
